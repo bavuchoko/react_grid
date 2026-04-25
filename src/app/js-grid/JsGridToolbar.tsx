@@ -23,7 +23,7 @@ type Props = {
 export default function JsGridToolbar(props: Props) {
     return (
         <div style={{background:'#f8f8f8', padding: '6px 12px', borderBottom: `1px solid #bdc2c9`, ...props.style}}>
-            <div style={{display: 'flex', alignItems:'center', gap:'10px', justifyContent:'end'}}>
+            <div style={{display: 'flex', alignItems:'center', gap:'16px', justifyContent:'end'}}>
 
                 {props.onCreate && (
                     <>
@@ -34,9 +34,6 @@ export default function JsGridToolbar(props: Props) {
                             />
                         </ToolbarHint>
 
-                        {(props.onTrash || props.onExport) && (
-                            <div style={{borderLeft:'1px solid rgb(189, 194, 201)', height:'16px', margin:'0 4px'}} />
-                        )}
                     </>
                 )}
 
@@ -56,7 +53,6 @@ export default function JsGridToolbar(props: Props) {
                             />
                         </ToolbarHint>
 
-                        <div style={{borderLeft:'1px solid rgb(189, 194, 201)', height:'16px', margin:'0 4px'}} />
                     </>
                 )}
 
@@ -69,7 +65,7 @@ export default function JsGridToolbar(props: Props) {
                             />
                         </ToolbarHint>
 
-                        <div style={{borderLeft:'1px solid rgb(189, 194, 201)', height:'16px', margin:'0 4px'}} />
+                        <div style={{borderLeft:'1px solid rgb(189, 194, 201)', height:'16px', margin:'0 2px'}} />
                     </>
                 )}
 
