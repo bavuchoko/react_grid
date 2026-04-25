@@ -53,7 +53,6 @@ export default function JsGridTable(props: Props) {
                                             return;
                                         }
                                         if (isCheckbox) {
-                                            if (e.target instanceof HTMLInputElement) return;
                                             props.rowSelection?.onToggleAll();
                                             return;
                                         }
@@ -93,11 +92,8 @@ export default function JsGridTable(props: Props) {
                                                 type="checkbox"
                                                 checked={props.rowSelection.headerChecked}
                                                 disabled={props.rowSelection.pageRowIds.length === 0}
-                                                onChange={(e) => {
-                                                    e.stopPropagation();
-                                                    props.rowSelection?.onToggleAll();
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
+                                                readOnly
+                                                style={{ pointerEvents: 'none' }}
                                             />
                                         </div>
                                     ) : (
@@ -207,6 +203,11 @@ export default function JsGridTable(props: Props) {
                                     <td
                                         key={String(column.key ?? cdex)}
                                         className={`border h-[30px]`}
+                                        onClick={() => {
+                                            if (!isCheckbox || !props.rowSelection) return;
+                                            if (rowId == null) return;
+                                            props.rowSelection.onToggleRow(rowId);
+                                        }}
                                         style={{
                                             borderBottom: `1px solid ${GRID_BORDER}`,
                                             borderRight: `1px solid ${GRID_BORDER}`,
@@ -222,6 +223,7 @@ export default function JsGridTable(props: Props) {
                                             textAlign: isCheckbox ? 'center' : isRowNum ? 'right' : undefined,
                                             paddingRight: isCheckbox ? undefined : 14,
                                             paddingLeft: isCheckbox ? undefined : isRowNum ? undefined : 14,
+                                            cursor: isCheckbox && props.rowSelection && rowId != null ? 'pointer' : undefined,
                                             ...props.getStickyStyle({ colIndex: cdex, isHeader: false }),
                                         }}
                                     >
@@ -230,11 +232,8 @@ export default function JsGridTable(props: Props) {
                                                 type="checkbox"
                                                 disabled={rowId == null}
                                                 checked={rowId != null && props.rowSelection.selectedIds.has(rowId)}
-                                                onChange={(e) => {
-                                                    e.stopPropagation();
-                                                    if (rowId != null) props.rowSelection?.onToggleRow(rowId);
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
+                                                readOnly
+                                                style={{ pointerEvents: 'none' }}
                                             />
                                         ) : (
                                             value as any
