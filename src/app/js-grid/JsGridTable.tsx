@@ -1,8 +1,8 @@
 import {getValue, gridRowNumericId} from "../hook/CommonMethod.ts";
 import {CELL_MAX_WIDTH_PX, GRID_BORDER} from "./gridStyles.ts";
 import {computeRowNumber} from "./rowNumber.ts";
-import type {CSSProperties, Dispatch, MutableRefObject, SetStateAction} from "react";
-import React, {isValidElement} from "react";
+import type {CSSProperties, Dispatch, MutableRefObject, ReactNode, SetStateAction} from "react";
+import React, {isValidElement, useCallback, useLayoutEffect, useRef, useState} from "react";
 import type {JsGridTableColumn, Page} from "../type/Type.ts";
 import ASC from "../resources/icon/ASC.tsx";
 import DESC from "../resources/icon/DESC.tsx";
@@ -10,6 +10,50 @@ import DESC from "../resources/icon/DESC.tsx";
 export type {JsGridTableColumn} from "../type/Type.ts";
 
 const SORT_ICON_PX = 14;
+
+type TruncatingTdProps = React.TdHTMLAttributes<HTMLTableCellElement> & {
+    children: ReactNode;
+};
+
+/** 말줄임이 실제로 일어난 경우에만 `title`로 전체 텍스트(호버 툴팁)를 붙인다. */
+function TruncatingTd({ children, style, ...rest }: TruncatingTdProps) {
+    const ref = useRef<HTMLTableCellElement>(null);
+    const [title, setTitle] = useState<string | undefined>(undefined);
+
+    const measure = useCallback(() => {
+        const el = ref.current;
+        if (!el) {
+            setTitle(undefined);
+            return;
+        }
+        const truncated = el.scrollWidth > el.clientWidth + 1;
+        if (truncated) {
+            const raw = el.innerText.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
+            setTitle(raw.length > 0 ? raw : undefined);
+        } else {
+            setTitle(undefined);
+        }
+    }, []);
+
+    useLayoutEffect(() => {
+        measure();
+        const el = ref.current;
+        if (!el) return undefined;
+        const ro = new ResizeObserver(() => {
+            measure();
+        });
+        ro.observe(el);
+        return () => {
+            ro.disconnect();
+        };
+    }, [measure, children]);
+
+    return (
+        <td ref={ref} {...rest} style={style} title={title}>
+            {children}
+        </td>
+    );
+}
 
 type RowSelectionProps = {
     pageRowIds: number[];
@@ -220,53 +264,58 @@ export default function JsGridTable(props: Props) {
                                             ? React.cloneElement(column.render as any, { row, value, columnKey: column.key, rowIndex: rdex, stopRowClick })
                                             : column.render))
                                     : null;
-                                return (
-                                    <td
-                                        key={String(column.key ?? cdex)}
-                                        className={`border h-[30px]`}
-                                        onClick={(e) => {
-                                            // 체크박스 셀: 행 클릭(onRowClick)으로 전파 막고 선택 토글
-                                            if (isCheckbox) {
-                                                e.stopPropagation();
-                                                if (!props.rowSelection) return;
-                                                props.rowSelection.onToggleRow(rdex);
-                                                return;
-                                            }
-                                            // render가 있는 셀은 기본적으로 행 클릭(onRowClick)으로 전파를 막는다.
-                                            if (column.render) {
-                                                e.stopPropagation();
-                                            }
-                                        }}
-                                        style={{
-                                            borderBottom: `1px solid ${GRID_BORDER}`,
-                                            borderRight: `1px solid ${GRID_BORDER}`,
-                                            width: props.colWidthByKey[String(column.key ?? cdex)]
-                                                ? `${props.colWidthByKey[String(column.key ?? cdex)]}px`
-                                                : undefined,
-                                            minWidth: isCheckbox ? '40px' : isRowNum ? '56px' : undefined,
-                                            maxWidth: isCheckbox || isRowNum ? undefined : CELL_MAX_WIDTH_PX,
-                                            boxSizing: 'border-box',
-                                            whiteSpace: 'nowrap',
-                                            overflow: isCheckbox || isRowNum ? undefined : 'hidden',
-                                            textOverflow: isCheckbox || isRowNum ? undefined : 'ellipsis',
-                                            textAlign: isCheckbox ? 'center' : isRowNum ? 'right' : undefined,
-                                            paddingRight: isCheckbox ? undefined : 14,
-                                            paddingLeft: isCheckbox ? undefined : isRowNum ? undefined : 14,
-                                            cursor: isCheckbox && props.rowSelection ? 'pointer' : undefined,
-                                            ...props.getStickyStyle({ colIndex: cdex, isHeader: false }),
-                                        }}
-                                    >
-                                        {isCheckbox && props.rowSelection ? (
-                                            <input
-                                                type="checkbox"
-                                                checked={props.rowSelection.selectedIds.has(rdex)}
-                                                readOnly
-                                                style={{ pointerEvents: 'none' }}
-                                            />
-                                        ) : (
-                                            (rendered ?? (value as any))
-                                        )}
+
+                                const tdStyle: CSSProperties = {
+                                    borderBottom: `1px solid ${GRID_BORDER}`,
+                                    borderRight: `1px solid ${GRID_BORDER}`,
+                                    width: props.colWidthByKey[String(column.key ?? cdex)]
+                                        ? `${props.colWidthByKey[String(column.key ?? cdex)]}px`
+                                        : undefined,
+                                    minWidth: isCheckbox ? '40px' : isRowNum ? '56px' : undefined,
+                                    maxWidth: isCheckbox || isRowNum ? undefined : CELL_MAX_WIDTH_PX,
+                                    boxSizing: 'border-box',
+                                    whiteSpace: 'nowrap',
+                                    overflow: isCheckbox || isRowNum ? undefined : 'hidden',
+                                    textOverflow: isCheckbox || isRowNum ? undefined : 'ellipsis',
+                                    textAlign: isCheckbox ? 'center' : isRowNum ? 'right' : undefined,
+                                    paddingRight: isCheckbox ? undefined : 14,
+                                    paddingLeft: isCheckbox ? undefined : isRowNum ? undefined : 14,
+                                    cursor: isCheckbox && props.rowSelection ? 'pointer' : undefined,
+                                    ...props.getStickyStyle({ colIndex: cdex, isHeader: false }),
+                                };
+
+                                const onTdClick = (e: React.MouseEvent<HTMLTableCellElement>) => {
+                                    if (isCheckbox) {
+                                        e.stopPropagation();
+                                        if (!props.rowSelection) return;
+                                        props.rowSelection.onToggleRow(rdex);
+                                        return;
+                                    }
+                                    if (column.render) {
+                                        e.stopPropagation();
+                                    }
+                                };
+
+                                const tdChildren = isCheckbox && props.rowSelection ? (
+                                    <input
+                                        type="checkbox"
+                                        checked={props.rowSelection.selectedIds.has(rdex)}
+                                        readOnly
+                                        style={{ pointerEvents: 'none' }}
+                                    />
+                                ) : (
+                                    (rendered ?? (value as any))
+                                );
+
+                                const colKey = String(column.key ?? cdex);
+                                return isCheckbox || isRowNum ? (
+                                    <td key={colKey} className="border h-[30px]" onClick={onTdClick} style={tdStyle}>
+                                        {tdChildren}
                                     </td>
+                                ) : (
+                                    <TruncatingTd key={colKey} className="border h-[30px]" onClick={onTdClick} style={tdStyle}>
+                                        {tdChildren}
+                                    </TruncatingTd>
                                 );
                             })}
                         </tr>
