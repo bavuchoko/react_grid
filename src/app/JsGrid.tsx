@@ -92,6 +92,18 @@ const JsGrid =(props:GridType)=> {
 
     const showDelete = Boolean(props.onDeleteClick);
 
+    const headerWidthSig = useMemo(
+        () => headerList.map((h) => `${h.key}:${h.width ?? ""}`).join("\u0001"),
+        [header],
+    );
+    const persistedColWidths = useMemo(() => {
+        const m: Record<string, number> = {};
+        for (const h of headerList) {
+            if (typeof h.width === "number" && h.width > 0) m[h.key] = Math.round(h.width);
+        }
+        return m;
+    }, [headerWidthSig]);
+
     const columns = useMemo((): readonly JsGridTableColumn[] => {
         const list = header ?? [];
         const headerByKey = new Map(list.map((h) => [h.key, h] as const));
@@ -133,9 +145,13 @@ const JsGrid =(props:GridType)=> {
     }, [isFieldsMenuOpen]);
 
     const { freezeUntilIndex, setFreezeUntilIndex } = useFreezeColumns(columns.length);
-    const { headerCellRefs, colWidthByKey } = useColumnWidths(columns);
+    const { headerCellRefs, colWidthByKey, measuredWidthByKey, setColumnWidth } = useColumnWidths(
+        columns,
+        persistedColWidths,
+        headerWidthSig,
+    );
 
-    const leftOffsets = useMemo(() => computeLeftOffsets(columns, colWidthByKey), [columns, colWidthByKey]);
+    const leftOffsets = useMemo(() => computeLeftOffsets(columns, measuredWidthByKey), [columns, measuredWidthByKey]);
 
     const getStickyStyle = useCallback((args: { colIndex: number; isHeader: boolean }) => {
         return getColumnFreezeStickyStyle({
@@ -311,7 +327,7 @@ const JsGrid =(props:GridType)=> {
                         props.onHeaderReset?.();
                     }}
                     onSave={() => {
-                        const payload: HeaderState[] = toHeaderState(userColumns);
+                        const payload: HeaderState[] = toHeaderState(userColumns, colWidthByKey);
                         props.onHeaderSave?.(payload);
                         setIsFieldsMenuOpen(false);
                     }}
@@ -325,6 +341,7 @@ const JsGrid =(props:GridType)=> {
                     sortDir={sortDir}
                     headerCellRefs={headerCellRefs}
                     colWidthByKey={colWidthByKey}
+                    onColumnWidthChange={setColumnWidth}
                     setFreezeUntilIndex={setFreezeUntilIndex}
                     getStickyStyle={getStickyStyle}
                     rowSelection={rowSelection}

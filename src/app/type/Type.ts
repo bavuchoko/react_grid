@@ -30,6 +30,8 @@ export type HeaderState = {
     key: string;
     label: string;
     visible: boolean;
+    /** 저장된 컬럼 너비(px). 없으면 기본 레이아웃·측정에 따름. */
+    width?: number;
 }
 
 type Data = {
@@ -75,6 +77,8 @@ export type Header ={
     key:string;
     label:string;
     type: DataType;
+    /** 사용자/서버 저장 너비(px). 있으면 해당 컬럼에 적용, 없으면 자동 너비. */
+    width?: number;
     /**
      * 셀 커스텀 렌더링.
      * - 함수면 `(args) => ReactNode` 형태로 호출된다.
