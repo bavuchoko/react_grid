@@ -2,11 +2,12 @@ import {getValue, gridRowNumericId} from "../hook/CommonMethod.ts";
 import {CELL_MAX_WIDTH_PX, GRID_BORDER} from "./gridStyles.ts";
 import {computeRowNumber} from "./rowNumber.ts";
 import type {CSSProperties, Dispatch, MutableRefObject, SetStateAction} from "react";
-import type {Page} from "../type/Type.ts";
+import React, {isValidElement} from "react";
+import type {JsGridTableColumn, Page} from "../type/Type.ts";
 import ASC from "../resources/icon/ASC.tsx";
 import DESC from "../resources/icon/DESC.tsx";
 
-type Column = { key: string; label: string; __rownum__?: boolean; __checkbox__?: boolean };
+export type {JsGridTableColumn} from "../type/Type.ts";
 
 const SORT_ICON_PX = 14;
 
@@ -20,7 +21,7 @@ type RowSelectionProps = {
 };
 
 type Props = {
-    columns: readonly Column[];
+    columns: readonly JsGridTableColumn[];
     data: unknown[];
     page: Page;
     sortKey: string | null;
@@ -32,13 +33,14 @@ type Props = {
     getStickyStyle: (args: { colIndex: number; isHeader: boolean }) => CSSProperties | undefined;
     onSortChange: (next: { key: string; direction: 'ASC' | 'DESC' }) => void;
     rowSelection?: RowSelectionProps;
+    onRowClick?: (row: unknown) => void;
 };
 
 export default function JsGridTable(props: Props) {
     return (
         <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <table style={{ width: 'max-content', borderCollapse: 'separate', borderSpacing: 0 }}>
-                <thead style={{background:'#f8f8f8'}}>
+                <thead style={{backgroundColor:'#f8f8f8'}}>
                     <tr>
                         {props.columns.map((column, cdex) => {
                             const isRowNum = Boolean(column.__rownum__);
@@ -67,7 +69,7 @@ export default function JsGridTable(props: Props) {
                                         position: 'sticky',
                                         top: 0,
                                         zIndex: 4,
-                                        background: '#f8f8f8',
+                                        backgroundColor: '#f8f8f8',
                                         borderBottom: `1px solid ${GRID_BORDER}`,
                                         borderRight: `1px solid ${GRID_BORDER}`,
                                         minWidth: isCheckbox ? '40px' : isRowNum ? '56px' : '80px',
@@ -183,7 +185,12 @@ export default function JsGridTable(props: Props) {
                     {props.data.map((row, rdex) => {
                         const rowId = gridRowNumericId(row);
                         return (
-                        <tr key={rowId ?? `r-${rdex}`} className={`border`}>
+                        <tr
+                            key={rowId ?? `r-${rdex}`}
+                            className={`border`}
+                            onClick={() => props.onRowClick?.(row)}
+                            style={{ cursor: props.onRowClick ? 'pointer' : undefined }}
+                        >
                             {props.columns.map((column, cdex) => {
                                 const isRowNum = Boolean(column.__rownum__);
                                 const isCheckbox = Boolean(column.__checkbox__);
@@ -199,14 +206,36 @@ export default function JsGridTable(props: Props) {
                                         fallbackPageSize: props.data.length,
                                     })
                                     : getValue(row, column.key);
+
+                                const stopRowClick = (e: unknown) => {
+                                    if (e && typeof e === "object" && "stopPropagation" in e) {
+                                        (e as React.SyntheticEvent).stopPropagation();
+                                    }
+                                };
+
+                                const rendered = !isCheckbox && !isRowNum && column.render
+                                    ? (typeof column.render === 'function'
+                                        ? column.render({ row, value, columnKey: column.key, rowIndex: rdex, stopRowClick })
+                                        : (isValidElement(column.render)
+                                            ? React.cloneElement(column.render as any, { row, value, columnKey: column.key, rowIndex: rdex, stopRowClick })
+                                            : column.render))
+                                    : null;
                                 return (
                                     <td
                                         key={String(column.key ?? cdex)}
                                         className={`border h-[30px]`}
-                                        onClick={() => {
-                                            if (!isCheckbox || !props.rowSelection) return;
-                                            if (rowId == null) return;
-                                            props.rowSelection.onToggleRow(rowId);
+                                        onClick={(e) => {
+                                            // 체크박스 셀: 행 클릭(onRowClick)으로 전파 막고 선택 토글
+                                            if (isCheckbox) {
+                                                e.stopPropagation();
+                                                if (!props.rowSelection) return;
+                                                props.rowSelection.onToggleRow(rdex);
+                                                return;
+                                            }
+                                            // render가 있는 셀은 기본적으로 행 클릭(onRowClick)으로 전파를 막는다.
+                                            if (column.render) {
+                                                e.stopPropagation();
+                                            }
                                         }}
                                         style={{
                                             borderBottom: `1px solid ${GRID_BORDER}`,
@@ -223,20 +252,19 @@ export default function JsGridTable(props: Props) {
                                             textAlign: isCheckbox ? 'center' : isRowNum ? 'right' : undefined,
                                             paddingRight: isCheckbox ? undefined : 14,
                                             paddingLeft: isCheckbox ? undefined : isRowNum ? undefined : 14,
-                                            cursor: isCheckbox && props.rowSelection && rowId != null ? 'pointer' : undefined,
+                                            cursor: isCheckbox && props.rowSelection ? 'pointer' : undefined,
                                             ...props.getStickyStyle({ colIndex: cdex, isHeader: false }),
                                         }}
                                     >
                                         {isCheckbox && props.rowSelection ? (
                                             <input
                                                 type="checkbox"
-                                                disabled={rowId == null}
-                                                checked={rowId != null && props.rowSelection.selectedIds.has(rowId)}
+                                                checked={props.rowSelection.selectedIds.has(rdex)}
                                                 readOnly
                                                 style={{ pointerEvents: 'none' }}
                                             />
                                         ) : (
-                                            value as any
+                                            (rendered ?? (value as any))
                                         )}
                                     </td>
                                 );

@@ -4,15 +4,15 @@ import {useMemo, useState} from "react";
 
 const App = () => {
     const [pageNumber, setPageNumber] = useState(0);
-
+    const MyCell = (props: any) => <span onClick={()=>console.log(props.value)}>{props.rowIndex}: {String(props.value ?? "")}</span>;
     const header: Header[] = [
         {key:'creator.name', label:'등록자', type:'string'},
-        {key:'state', label:'진행상태', type:'state'},
+        {key:'state', label:'진행상태', type:'state', },
         {key:'title', label:'제목', type:'string'},
         {key:'number', label:'티켓번호', type:'string'},
         {key:'createdAt', label:'등록일', type:'date'},
         {key:'requester.name', label:'요청자', type:'string'},
-        {key:'score', label:'만족도', type:'score'},
+        {key:'score', label:'만족도', type:'score', render: <MyCell />},
         {key:'deadLine.endBy', label:'만료일', type:'date'},
         {key:'category.name', label:'카테고리', type:'string'},
         {key:'updatedAt', label:'수정일', type:'date'},
@@ -57,18 +57,25 @@ const App = () => {
             <div style={{width:'700px', height:'500px',}}>
                 <div style={{width:300, height:200}}>test test test 다른 컴포넌트 tes test</div>
 
-                <JsGrid
-                    header={header}
-                    data={data}
-                    onSave={v => console.log(v)}
-                    onExport={() => console.log('export xls')}
-                    onCreate={() => console.log('create')}
-                    onDelete={(ids) => console.log('delete', ids)}
-                    onPageChange={(p) => {
-                        console.log('pageable', p);
-                        setPageNumber(p.pageNumber ?? 0);
-                    }}
-                />
+                <div style={{display:'flex'}}>
+                    <div className={`w-[300px] h-[200px]`}>aw</div>
+                    <JsGrid
+                        header={header}
+                        data={data}
+                        onHeaderSave={v => console.log(v)}
+                        onUploadClick={() => console.log('upload clicked')}
+                        onHeaderReset={() => console.log('reset clicked')}
+                        onDownloadClick={() => console.log('download Clicked')}
+                        onCreateClick={() => console.log('create')}
+                        onDeleteClick={(rows) => console.log('delete', rows)}
+                        onRowClick={(rows)=>console.log('rowClick', rows)}
+                        onPageChange={(p) => {
+                            console.log('pageable', p);
+                            setPageNumber(p.pageNumber ?? 0);
+                        }}
+
+                    />
+                </div>
             </div>
 
         </div>

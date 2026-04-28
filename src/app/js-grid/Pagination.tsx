@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from "react";
+import {useMemo, useRef, useState} from "react";
 import Prev from "../resources/icon/Prev.tsx";
 import Forward from "../resources/icon/Forward.tsx";
 import type {Page} from "../type/Type.ts";
@@ -24,12 +24,16 @@ export default function Pagination(props: Props) {
     }, [props.page.currentPage, totalPages]);
 
     // number input은 브라우저/IME 조합에 따라 "앞자리 삭제" UX가 불안정할 수 있어 문자열로 편집한다.
-    const [draftPage1, setDraftPage1] = useState(String(current0 + 1));
+    const [draftPage1, setDraftPage1] = useState(() => String(current0 + 1));
     const inputRef = useRef<HTMLInputElement | null>(null);
-
-    useEffect(() => {
+    const prevPageRef = useRef({ current0, totalPages });
+    if (
+        prevPageRef.current.current0 !== current0 ||
+        prevPageRef.current.totalPages !== totalPages
+    ) {
+        prevPageRef.current = { current0, totalPages };
         setDraftPage1(String(current0 + 1));
-    }, [current0, totalPages]);
+    }
 
     const commitDraft = () => {
         const raw = draftPage1.trim();
@@ -66,7 +70,6 @@ export default function Pagination(props: Props) {
                 height: 30,
                 borderTop: "1px solid rgb(189, 194, 201)",
                 borderBottom: "1px solid rgb(189, 194, 201)",
-                backgroundColor: "rgb(248, 248, 248)",
                 padding: 6,
                 lineHeight: "20px",
                 boxSizing: "border-box",

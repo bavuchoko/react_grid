@@ -1,7 +1,7 @@
-import type {GridType, HeaderState, Page} from "./type/Type.ts";
-import {gridRowNumericId} from "./hook/CommonMethod.ts";
+import type {GridType, Header, HeaderState, JsGridTableColumn, Page} from "./type/Type.ts";
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import ColumnFieldsMenu, {toHeaderState, type UserColumn} from "./js-grid/ColumnFieldsMenu.tsx";
+import ColumnFieldsMenu from "./js-grid/ColumnFieldsMenu.tsx";
+import {toHeaderState, type UserColumn} from "./js-grid/columnFieldsMenuModel.ts";
 import {computeLeftOffsets, getColumnFreezeStickyStyle} from "./js-grid/columnLayout.ts";
 import {GRID_BORDER} from "./js-grid/gridStyles.ts";
 import JsGridTable from "./js-grid/JsGridTable.tsx";
@@ -12,7 +12,8 @@ import {useFreezeColumns} from "./js-grid/useFreezeColumns.ts";
 
 const JsGrid =(props:GridType)=> {
     const data = props.data?.content ?? []
-    const keys = props?.header ?? []
+    const header = props.header;
+    const headerList: Header[] = header ?? [];
     const page = {...props.data?.pageable,
         totalElements: props.data?.totalElements ?? 0,
         totalPages: props.data?.totalPages ?? 0 }
@@ -30,36 +31,49 @@ const JsGrid =(props:GridType)=> {
     const [sortKey, setSortKey] = useState<string | null>(() => parseSortFromPageable(props.data?.pageable).key);
     const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => parseSortFromPageable(props.data?.pageable).dir);
 
-    useEffect(() => {
-        const next = parseSortFromPageable(props.data?.pageable);
-        setSortKey(next.key);
-        setSortDir(next.dir);
-    }, [props.data?.pageable]);
+    const serverSort = useMemo(() => parseSortFromPageable(props.data?.pageable), [props.data?.pageable]);
+    const serverSortToken = `${serverSort.key ?? ''}\u0000${serverSort.dir}`;
+    const [prevServerSortToken, setPrevServerSortToken] = useState(() => {
+        const s = parseSortFromPageable(props.data?.pageable);
+        return `${s.key ?? ''}\u0000${s.dir}`;
+    });
+    if (prevServerSortToken !== serverSortToken) {
+        setPrevServerSortToken(serverSortToken);
+        setSortKey(serverSort.key);
+        setSortDir(serverSort.dir);
+    }
 
+    const enablePseudoFullscreen = props.enablePseudoFullscreen !== false;
     const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
     const rootRef = useRef<HTMLDivElement | null>(null);
 
     const [userColumns, setUserColumns] = useState<UserColumn[]>([]);
 
-    useEffect(() => {
-        // props.header 변경 시: 기존 설정(visible/order)을 최대한 유지
+    const keysSig = useMemo(
+        () => (header ?? []).map((h) => h.key).join('\u0001'),
+        [header],
+    );
+    const [prevKeysSig, setPrevKeysSig] = useState<string | null>(null);
+    if (prevKeysSig !== keysSig) {
+        setPrevKeysSig(keysSig);
         setUserColumns((prev) => {
-            const prevByKey = new Map(prev.map(c => [c.key, c] as const));
+            const prevByKey = new Map(prev.map((c) => [c.key, c] as const));
             const next: UserColumn[] = [];
-            for (const c of (keys as any[])) {
-                const k = String((c as any).key);
+            for (const c of headerList) {
+                const k = c.key;
                 const existing = prevByKey.get(k);
                 next.push({
                     key: k,
-                    label: String((c as any).label ?? k),
+                    label: String(c.label ?? k),
                     visible: existing?.visible ?? true,
                 });
             }
             return next;
         });
-    }, [keys]);
+    }
 
     useEffect(() => {
+        if (!enablePseudoFullscreen) return;
         if (!isPseudoFullscreen) return;
 
         const prevOverflow = document.body.style.overflow;
@@ -74,16 +88,23 @@ const JsGrid =(props:GridType)=> {
             window.removeEventListener('keydown', onKeyDown);
             document.body.style.overflow = prevOverflow;
         };
-    }, [isPseudoFullscreen]);
+    }, [enablePseudoFullscreen, isPseudoFullscreen]);
 
-    const showDelete = Boolean(props.onDelete);
+    const showDelete = Boolean(props.onDeleteClick);
 
-    const columns = useMemo(() => {
-        const visible = userColumns.filter(c => c.visible).map(c => ({ key: c.key, label: c.label }));
+    const columns = useMemo((): readonly JsGridTableColumn[] => {
+        const list = header ?? [];
+        const headerByKey = new Map(list.map((h) => [h.key, h] as const));
+        const visible = userColumns
+            .filter((c) => c.visible)
+            .map((c) => {
+                const h = headerByKey.get(c.key);
+                return { key: c.key, label: c.label, render: h?.render };
+            });
         const rowNum = { key: "__rownum__", label: "#", __rownum__: true as const };
         const cb = { key: "__checkbox__", label: "", __checkbox__: true as const };
-        return (showDelete ? [cb, rowNum, ...visible] : [rowNum, ...visible]) as readonly { key: string; label: string; __rownum__?: boolean; __checkbox__?: boolean }[];
-    }, [userColumns, showDelete]);
+        return showDelete ? [cb, rowNum, ...visible] : [rowNum, ...visible];
+    }, [userColumns, showDelete, header]);
 
     const [isFieldsMenuOpen, setIsFieldsMenuOpen] = useState(false);
     const [fieldsMenuPos, setFieldsMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -143,22 +164,22 @@ const JsGrid =(props:GridType)=> {
         props.onPageChange?.(next);
     }, [props.onPageChange]);
 
-    const [selectedRowIds, setSelectedRowIds] = useState<Set<number>>(() => new Set());
+    const [selectedRowIndexes, setSelectedRowIndexes] = useState<Set<number>>(() => new Set());
+    const [selectionAnchor, setSelectionAnchor] = useState(() => ({
+        page: page.pageNumber ?? 0,
+        show: Boolean(props.onDeleteClick),
+    }));
 
     const pageRowIds = useMemo(() => {
-        const ids: number[] = [];
-        for (const row of data) {
-            const id = gridRowNumericId(row);
-            if (id != null) ids.push(id);
-        }
-        return ids;
+        // 선택은 `row.id`가 없어도 동작해야 하므로, 현재 페이지의 행 인덱스를 키로 사용한다.
+        return data.map((_, idx) => idx);
     }, [data]);
 
     const headerChecked =
-        pageRowIds.length > 0 && pageRowIds.every((id) => selectedRowIds.has(id));
+        pageRowIds.length > 0 && pageRowIds.every((id) => selectedRowIndexes.has(id));
 
     const toggleSelectAll = useCallback(() => {
-        setSelectedRowIds((prev) => {
+        setSelectedRowIndexes((prev) => {
             const next = new Set(prev);
             const allOn = pageRowIds.length > 0 && pageRowIds.every((id) => next.has(id));
             if (allOn) {
@@ -171,7 +192,7 @@ const JsGrid =(props:GridType)=> {
     }, [pageRowIds]);
 
     const toggleSelectRow = useCallback((id: number) => {
-        setSelectedRowIds((prev) => {
+        setSelectedRowIndexes((prev) => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
             else next.add(id);
@@ -179,20 +200,21 @@ const JsGrid =(props:GridType)=> {
         });
     }, []);
 
-    useEffect(() => {
-        setSelectedRowIds(new Set());
-    }, [currentPage0, showDelete]);
+    if (selectionAnchor.page !== currentPage0 || selectionAnchor.show !== showDelete) {
+        setSelectionAnchor({ page: currentPage0, show: showDelete });
+        setSelectedRowIndexes(new Set());
+    }
 
     const rowSelection = useMemo(() => {
         if (!showDelete) return undefined;
         return {
             pageRowIds,
-            selectedIds: selectedRowIds,
+            selectedIds: selectedRowIndexes,
             headerChecked,
             onToggleAll: toggleSelectAll,
             onToggleRow: toggleSelectRow,
         };
-    }, [showDelete, pageRowIds, selectedRowIds, headerChecked, toggleSelectAll, toggleSelectRow]);
+    }, [showDelete, pageRowIds, selectedRowIndexes, headerChecked, toggleSelectAll, toggleSelectRow]);
 
     return (
             <div
@@ -200,34 +222,51 @@ const JsGrid =(props:GridType)=> {
                 style={{
                     border: `1px solid ${GRID_BORDER}`,
                     borderBottom: 'none',
-                    width: isPseudoFullscreen ? '100vw' : '100%',
+                    width: '100%',
                     // 부모가 고정 height를 가질 때는 maxHeight:100%로 "부모 안"에 맞추고,
                     // 내부 테이블 영역(JsGridTable wrapper)이 flex:1 + overflow:auto로 스크롤을 담당한다.
-                    height: isPseudoFullscreen ? '100vh' : 'auto',
-                    maxHeight: isPseudoFullscreen ? undefined : '100%',
+                    height: 'auto',
+                    maxHeight: '100%',
                     overflow: 'hidden',
-                    background: '#ffffff',
+                    backgroundColor: '#ffffff',
                     display: 'flex',
                     flexDirection: 'column',
                     boxSizing: 'border-box',
                     minHeight: 0,
-                    position: isPseudoFullscreen ? 'fixed' : undefined,
-                    inset: isPseudoFullscreen ? 0 : undefined,
-                    zIndex: isPseudoFullscreen ? 9999 : undefined,
-                    boxShadow: isPseudoFullscreen ? '0 10px 30px rgba(0,0,0,0.18)' : undefined,
+                    ...(props.style ?? {}),
+                    ...(isPseudoFullscreen
+                        ? {
+                            width: '100vw',
+                            height: '100vh',
+                            maxHeight: undefined,
+                            position: 'fixed' as const,
+                            inset: 0,
+                            zIndex: 9999,
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+                        }
+                        : null),
                 }}
             >
                 <JsGridToolbar
                     fieldsBtnRef={fieldsBtnRef}
                     isPseudoFullscreen={isPseudoFullscreen}
-                    onExport={props.onExport}
-                    onCreate={props.onCreate}
-                    onTrash={
-                        props.onDelete
-                            ? () => props.onDelete?.(Array.from(selectedRowIds))
+                    enablePseudoFullscreen={enablePseudoFullscreen}
+                    onDownLoadClick={props.onDownloadClick}
+                    onUploadClick={props.onUploadClick}
+                    onCreateClick={props.onCreateClick}
+                    onTrashClick={
+                        props.onDeleteClick
+                            ? () => {
+                                const selectedRows = Array
+                                    .from(selectedRowIndexes)
+                                    .sort((a, b) => a - b)
+                                    .map((i) => data[i])
+                                    .filter((v) => v !== undefined);
+                                props.onDeleteClick?.(selectedRows);
+                            }
                             : undefined
                     }
-                    trashDisabled={selectedRowIds.size === 0}
+                    trashDisabled={selectedRowIndexes.size === 0}
                     onToggleFieldsMenu={(e) => {
                         e.stopPropagation();
                         const rect = fieldsBtnRef.current?.getBoundingClientRect();
@@ -262,21 +301,24 @@ const JsGrid =(props:GridType)=> {
                         setUserColumns((prev) => prev.map(x => x.key === key ? { ...x, visible } : x));
                     }}
                     onReset={() => {
-                        setUserColumns((keys as any[]).map((c) => ({
-                            key: String((c as any).key),
-                            label: String((c as any).label ?? (c as any).key),
-                            visible: true,
-                        })));
+                        setUserColumns(
+                            headerList.map((c) => ({
+                                key: c.key,
+                                label: String(c.label ?? c.key),
+                                visible: true,
+                            })),
+                        );
+                        props.onHeaderReset?.();
                     }}
                     onSave={() => {
                         const payload: HeaderState[] = toHeaderState(userColumns);
-                        props.onSave?.(payload);
+                        props.onHeaderSave?.(payload);
                         setIsFieldsMenuOpen(false);
                     }}
                 />
 
                 <JsGridTable
-                    columns={columns as any}
+                    columns={columns}
                     data={data}
                     page={page}
                     sortKey={sortKey}
@@ -286,6 +328,7 @@ const JsGrid =(props:GridType)=> {
                     setFreezeUntilIndex={setFreezeUntilIndex}
                     getStickyStyle={getStickyStyle}
                     rowSelection={rowSelection}
+                    onRowClick={props.onRowClick}
                     onSortChange={(next) => {
                         setSortKey(next.key);
                         setSortDir(next.direction);
@@ -299,7 +342,7 @@ const JsGrid =(props:GridType)=> {
                         });
                     }}
                 />
-                <div style={{ flex: "0 0 auto" }}>
+                <div style={{ flex: "0 0 auto" , backgroundColor: "rgb(248, 248, 248)",}}>
                     <Pagination
                         page={{
                             currentPage: currentPage0,

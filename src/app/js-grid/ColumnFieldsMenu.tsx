@@ -1,9 +1,7 @@
-import type {HeaderState} from "../type/Type.ts";
 import type {MutableRefObject} from "react";
 import Reset from "../resources/icon/Reset.tsx";
 import Disk from "../resources/icon/Disk.tsx";
-
-export type UserColumn = { key: string; label: string; visible: boolean };
+import type {UserColumn} from "./columnFieldsMenuModel.ts";
 
 type Props = {
     open: boolean;
@@ -27,7 +25,7 @@ export default function ColumnFieldsMenu(props: Props) {
                 top: props.pos.top,
                 right: props.pos.right,
                 width: 200,
-                background: 'rgb(246,246,246)',
+                backgroundColor: 'rgb(246,246,246)',
                 border: '1px solid #bdc2c9',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
                 zIndex: 10000,
@@ -82,7 +80,7 @@ export default function ColumnFieldsMenu(props: Props) {
                         fontSize: 12,
                         padding: '4px 8px',
                         border: '1px solid #bdc2c9',
-                        background: '#f8f8f8',
+                        backgroundColor: '#f8f8f8',
                         borderRadius: 6,
                         cursor: 'pointer',
                         whiteSpace: 'nowrap',
@@ -101,7 +99,7 @@ export default function ColumnFieldsMenu(props: Props) {
                         fontSize: 12,
                         padding: '4px 8px',
                         border: '1px solid #1d4ed8',
-                        background: '#1d4ed8',
+                        backgroundColor: '#1d4ed8',
                         color: '#ffffff',
                         borderRadius: 6,
                         cursor: 'pointer',
@@ -116,8 +114,4 @@ export default function ColumnFieldsMenu(props: Props) {
             </div>
         </div>
     );
-}
-
-export function toHeaderState(userColumns: UserColumn[]): HeaderState[] {
-    return userColumns.map(c => ({ key: c.key, label: c.label, visible: c.visible }));
 }
