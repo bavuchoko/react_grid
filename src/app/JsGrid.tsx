@@ -241,7 +241,9 @@ const JsGrid =(props:GridType)=> {
                     width: '100%',
                     // 부모가 고정 height를 가질 때는 maxHeight:100%로 "부모 안"에 맞추고,
                     // 내부 테이블 영역(JsGridTable wrapper)이 flex:1 + overflow:auto로 스크롤을 담당한다.
-                    height: 'auto',
+                    // flex 레이아웃(부모가 display:flex)에서도 부모 높이를 따라가도록 한다.
+                    flex: '1 1 auto',
+                    alignSelf: 'stretch',
                     maxHeight: '100%',
                     overflow: 'hidden',
                     backgroundColor: '#ffffff',

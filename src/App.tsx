@@ -54,11 +54,8 @@ const App = () => {
 
     return (
         <div>
-            <div style={{width:'700px', height:'500px',}}>
-                <div style={{width:300, height:200}}>test test test 다른 컴포넌트 tes test</div>
 
-                <div style={{display:'flex'}}>
-                    <div className={`w-[300px] h-[200px]`}>aw</div>
+                <div style={{width:'500px', height:'400px'}}>
                     <JsGrid
                         header={header}
                         data={data}
@@ -76,7 +73,6 @@ const App = () => {
 
                     />
                 </div>
-            </div>
 
         </div>
     );
