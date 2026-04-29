@@ -1,6 +1,7 @@
 import type {Header} from "./app/type/Type.ts";
 import JsGrid from "./app/JsGrid.tsx";
 import {useCallback, useMemo, useState} from "react";
+import {removeRowsFromExcelGridData} from "./app/utils/removeRowsFromExcelGridData.ts";
 
 const PAGE_SIZE = 15;
 const TOTAL_ELEMENTS = 150;
@@ -14,6 +15,7 @@ const MyCell = (props: any) => (
 
 const App = () => {
     const [pageNumber, setPageNumber] = useState(0);
+    const [deleteBusy, setDeleteBusy] = useState(false);
     const header: Header[] = useMemo(
         () => [
             {key: "creator.name", label: "등록자", type: "string"},
@@ -31,7 +33,7 @@ const App = () => {
         [],
     );
 
-    const allRows = useMemo(() => (
+    const [data, setData] = useState(() => (
         Array.from({ length: PAGE_SIZE }, (_, i) => ({
             id: pageNumber * PAGE_SIZE + i + 1,
             creator: {name: "등록자"},
@@ -46,7 +48,7 @@ const App = () => {
             updatedAt: "2026-01-02",
             transTo: {title: "이관정보"},
         }))
-    ), [pageNumber]);
+    ));
 
     const onHeaderSave = useCallback((v: unknown) => console.log(v), []);
     const onUploadFiles = useCallback(async (files: File[]) => {
@@ -59,24 +61,46 @@ const App = () => {
     const onHeaderReset = useCallback(() => console.log("reset clicked"), []);
     const onDownloadClick = useCallback(() => console.log("download Clicked"), []);
     const onCreateClick = useCallback(() => console.log("create"), []);
-    const onDeleteClick = useCallback((rows: unknown) => console.log("delete", rows), []);
+    // api 요청 테스트용 삭제 메서드
+    const deleteApi = useCallback((ids: number[]) =>
+        new Promise<void>((resolve) => {
+            console.log("delete 요청", ids);
+            window.setTimeout(() => resolve(), 1000);
+        }), []);
+
+    const onDeleteClick = useCallback(async (rows: unknown[]) => {
+        const ids = rows
+            .map((r) => (r as { id?: unknown }).id)
+            .filter((id): id is number => typeof id === "number" && Number.isFinite(id));
+        if (ids.length === 0) return;
+
+        setDeleteBusy(true);
+        try {
+            await deleteApi(ids);
+            setData((prev) => removeRowsFromExcelGridData({ data: prev, ids }));
+        } finally {
+            setDeleteBusy(false);
+        }
+    }, [deleteApi]);
+
+
     const onRowClick = useCallback((rows: unknown) => console.log("rowClick", rows), []);
     const onPageChange = useCallback((p: any) => {
         console.log("pageable", p);
         setPageNumber(p.pageNumber ?? 0);
     }, []);
 
-    const data = useMemo(() => {
+    const pageData = useMemo(() => {
         // 서버 페이징을 가정한 데모:
         // - 실제 서비스에서는 페이지 변경 시 서버가 새 content를 내려주기 전까지는 기존 rows가 유지되는 경우가 많다.
         // - 그래서 여기서는 pageNumber만 바꾸고 content는 그대로 둔다.
         return {
-            content: allRows,
+            content: data,
             pageable: {pageNumber, pageSize: PAGE_SIZE, size: PAGE_SIZE},
             totalElements: TOTAL_ELEMENTS,
             totalPages: TOTAL_PAGES,
         };
-    }, [allRows, pageNumber]);
+    }, [data, pageNumber]);
 
     return (
         <div>
@@ -84,13 +108,14 @@ const App = () => {
                 <JsGrid
                     style={{flex:'0 0 auto', maxHeight:'none'}}
                     header={header}
-                    data={data}
+                    data={pageData}
                     onHeaderSave={onHeaderSave}
                     onUploadFiles={onUploadFiles}
                     onHeaderReset={onHeaderReset}
                     onDownloadClick={onDownloadClick}
                     onCreateClick={onCreateClick}
                     onDeleteClick={onDeleteClick}
+                    onDeleteBusy={deleteBusy}
                     onRowClick={onRowClick}
                     onPageChange={onPageChange}
                 />

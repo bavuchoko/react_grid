@@ -25,6 +25,7 @@ type Props = {
     onCreateClick?: () => void;
     /** 선택된 행 삭제(콜백은 부모에서 `onDelete`와 연결) */
     onTrashClick?: () => void;
+    trashBusy?: boolean;
     trashDisabled?: boolean;
     style?: CSSProperties;
 };
@@ -41,11 +42,13 @@ export default function JsGridToolbar({
     uploadBusy,
     onCreateClick,
     onTrashClick,
+    trashBusy,
     trashDisabled,
     style,
 }: Props) {
     const showPseudoFullscreen = enablePseudoFullscreen !== false;
     const uploadSpinClass = useId().replace(/:/g, "");
+    const trashSpinClass = useId().replace(/:/g, "");
 
     return (
         <div style={{backgroundColor:'#f8f8f8', padding: '6px 12px', borderBottom: `1px solid #bdc2c9`, userSelect: "none", cursor: "default", ...style}}>
@@ -55,6 +58,12 @@ export default function JsGridToolbar({
                 }
                 .jsgrid-toolbar-spin-dot-${uploadSpinClass} {
                     animation: jsgrid-toolbar-spin-${uploadSpinClass} 0.75s linear infinite;
+                }
+                @keyframes jsgrid-toolbar-spin-${trashSpinClass} {
+                    to { transform: rotate(360deg); }
+                }
+                .jsgrid-toolbar-spin-dot-${trashSpinClass} {
+                    animation: jsgrid-toolbar-spin-${trashSpinClass} 0.75s linear infinite;
                 }
             `}</style>
             <div style={{display: 'flex', alignItems:'center', justifyContent:'space-between'}}>
@@ -147,18 +156,49 @@ export default function JsGridToolbar({
 
                 {onTrashClick && (
                     <>
-                        <ToolbarHint text={trashDisabled ? "삭제할 행을 선택하세요" : "선택 항목 삭제"}>
-                            <Trash
+                        <ToolbarHint text={trashBusy ? "삭제 중…" : (trashDisabled ? "삭제할 행을 선택하세요" : "선택 항목 삭제")}>
+                            <div
                                 style={{
-                                    width: '18px',
-                                    cursor: trashDisabled ? 'not-allowed' : 'pointer',
-                                    opacity: trashDisabled ? 0.45 : 1,
+                                    position: "relative",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    width: 18,
+                                    height: 18,
+                                    cursor: (trashDisabled || trashBusy) ? "wait" : "pointer",
                                 }}
-                                onClick={() => {
-                                    if (trashDisabled) return;
-                                    onTrashClick();
-                                }}
-                            />
+                            >
+                                <Trash
+                                    style={{
+                                        width: '18px',
+                                        cursor: (trashDisabled || trashBusy) ? 'not-allowed' : 'pointer',
+                                        opacity: (trashDisabled || trashBusy) ? 0.45 : 1,
+                                        flexShrink: 0,
+                                    }}
+                                    onClick={() => {
+                                        if (trashDisabled || trashBusy) return;
+                                        onTrashClick();
+                                    }}
+                                />
+                                {trashBusy ? (
+                                    <span
+                                        className={`jsgrid-toolbar-spin-dot-${trashSpinClass}`}
+                                        style={{
+                                            position: "absolute",
+                                            inset: 0,
+                                            margin: "auto",
+                                            width: 14,
+                                            height: 14,
+                                            borderRadius: "50%",
+                                            border: "2px solid #e5e7eb",
+                                            borderTopColor: "#ef4444",
+                                            boxSizing: "border-box",
+                                            pointerEvents: "none",
+                                        }}
+                                        aria-hidden
+                                    />
+                                ) : null}
+                            </div>
                         </ToolbarHint>
 
                     </>

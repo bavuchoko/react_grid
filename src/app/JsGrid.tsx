@@ -1,5 +1,5 @@
 import type {GridType, Header, HeaderState, JsGridTableColumn, Page} from "./type/Type.ts";
-import {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react";
 import ColumnFieldsMenu from "./js-grid/ColumnFieldsMenu.tsx";
 import {toHeaderState, type UserColumn} from "./js-grid/columnFieldsMenuModel.ts";
 import {computeLeftOffsets, getColumnFreezeStickyStyle} from "./js-grid/columnLayout.ts";
@@ -48,6 +48,7 @@ const JsGrid =(props:GridType)=> {
     const enablePseudoFullscreen = props.enablePseudoFullscreen !== false;
     const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
     const rootRef = useRef<HTMLDivElement | null>(null);
+    const deleteSpinClass = useId().replace(/:/g, "");
 
     const [userColumns, setUserColumns] = useState<UserColumn[]>([]);
 
@@ -273,6 +274,16 @@ const JsGrid =(props:GridType)=> {
         setSelectedRowIndexes(new Set());
     }
 
+    const prevDeleteBusyRef = useRef(Boolean(props.onDeleteBusy));
+    useEffect(() => {
+        const prev = prevDeleteBusyRef.current;
+        const curr = Boolean(props.onDeleteBusy);
+        if (prev && !curr) {
+            setSelectedRowIndexes(new Set());
+        }
+        prevDeleteBusyRef.current = curr;
+    }, [props.onDeleteBusy]);
+
     const rowSelection = useMemo(() => {
         if (!showDelete) return undefined;
         return {
@@ -301,6 +312,7 @@ const JsGrid =(props:GridType)=> {
                     backgroundColor: '#ffffff',
                     display: 'flex',
                     flexDirection: 'column',
+                    position: 'relative',
                     boxSizing: 'border-box',
                     minHeight: 0,
                     ...(props.style ?? {}),
@@ -317,6 +329,14 @@ const JsGrid =(props:GridType)=> {
                         : null),
                 }}
             >
+                <style>{`
+                    @keyframes jsgrid-delete-spin-${deleteSpinClass} {
+                        to { transform: rotate(360deg); }
+                    }
+                    .jsgrid-delete-spin-dot-${deleteSpinClass} {
+                        animation: jsgrid-delete-spin-${deleteSpinClass} 0.75s linear infinite;
+                    }
+                `}</style>
                 <JsGridToolbar
                     fieldsBtnRef={fieldsBtnRef}
                     isPseudoFullscreen={isPseudoFullscreen}
@@ -338,7 +358,8 @@ const JsGrid =(props:GridType)=> {
                             }
                             : undefined
                     }
-                    trashDisabled={selectedRowIndexes.size === 0}
+                    trashBusy={props.onDeleteBusy}
+                    trashDisabled={selectedRowIndexes.size === 0 || props.onDeleteBusy}
                     onToggleFieldsMenu={(e) => {
                         e.stopPropagation();
                         if (uploadPanelBusy) return;
@@ -403,42 +424,101 @@ const JsGrid =(props:GridType)=> {
                     }}
                 />
 
-                <JsGridTable
-                    columns={columns}
-                    data={data}
-                    page={page}
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    headerCellRefs={headerCellRefs}
-                    colWidthByKey={colWidthByKey}
-                    onColumnWidthChange={setColumnWidth}
-                    setFreezeUntilIndex={setFreezeUntilIndex}
-                    getStickyStyle={getStickyStyle}
-                    rowSelection={rowSelection}
-                    onRowClick={props.onRowClick}
-                    onSortChange={(next) => {
-                        setSortKey(next.key);
-                        setSortDir(next.direction);
-                        const size = pageableBase.pageSize ?? pageableBase.size;
-                        emitPageable({
-                            ...pageableBase,
-                            pageNumber: 0,
-                            ...(size != null ? { pageSize: size, size } : {}),
-                            sort: [`${next.key},${next.direction.toLowerCase()}`],
-                            sortDirection: next.direction,
-                        });
+                <div
+                    style={{
+                        flex: "1 1 auto",
+                        minHeight: 0,
+                        position: "relative",
                     }}
-                />
-                <div style={{ flex: "0 0 auto" , backgroundColor: "rgb(248, 248, 248)",}}>
-                    <Pagination
-                        page={{
-                            currentPage: currentPage0,
-                            totalPages,
-                            totalElements: page.totalElements ?? 0,
+                >
+                    <div
+                        style={{
+                            filter: props.onDeleteBusy ? "blur(2px)" : undefined,
+                            pointerEvents: props.onDeleteBusy ? "none" : undefined,
+                            transition: "filter 120ms ease",
                         }}
-                        pageableBase={pageableBase}
-                        onPageChange={(nextPageable) => emitPageable(nextPageable)}
-                    />
+                    >
+                        <JsGridTable
+                            columns={columns}
+                            data={data}
+                            page={page}
+                            sortKey={sortKey}
+                            sortDir={sortDir}
+                            headerCellRefs={headerCellRefs}
+                            colWidthByKey={colWidthByKey}
+                            onColumnWidthChange={setColumnWidth}
+                            setFreezeUntilIndex={setFreezeUntilIndex}
+                            getStickyStyle={getStickyStyle}
+                            rowSelection={rowSelection}
+                            onRowClick={props.onRowClick}
+                            onSortChange={(next) => {
+                                setSortKey(next.key);
+                                setSortDir(next.direction);
+                                const size = pageableBase.pageSize ?? pageableBase.size;
+                                emitPageable({
+                                    ...pageableBase,
+                                    pageNumber: 0,
+                                    ...(size != null ? { pageSize: size, size } : {}),
+                                    sort: [`${next.key},${next.direction.toLowerCase()}`],
+                                    sortDirection: next.direction,
+                                });
+                            }}
+                        />
+                        <div style={{ flex: "0 0 auto" , backgroundColor: "rgb(248, 248, 248)",}}>
+                            <Pagination
+                                page={{
+                                    currentPage: currentPage0,
+                                    totalPages,
+                                    totalElements: page.totalElements ?? 0,
+                                }}
+                                pageableBase={pageableBase}
+                                onPageChange={(nextPageable) => emitPageable(nextPageable)}
+                            />
+                        </div>
+                    </div>
+                    {props.onDeleteBusy ? (
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "rgba(255,255,255,0.35)",
+                                zIndex: 3,
+                                pointerEvents: "none",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                    padding: "10px 14px",
+                                    borderRadius: 8,
+                                    background: "rgba(255,255,255,0.9)",
+                                    border: "1px solid #d1d5db",
+                                    color: "#111827",
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                }}
+                            >
+                                <span
+                                    className={`jsgrid-delete-spin-dot-${deleteSpinClass}`}
+                                    style={{
+                                        width: 16,
+                                        height: 16,
+                                        borderRadius: "50%",
+                                        border: "2px solid #e5e7eb",
+                                        borderTopColor: "#ef4444",
+                                        boxSizing: "border-box",
+                                    }}
+                                    aria-hidden
+                                />
+                                삭제 중...
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             </div>
     );
