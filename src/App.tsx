@@ -49,7 +49,13 @@ const App = () => {
     ), [pageNumber]);
 
     const onHeaderSave = useCallback((v: unknown) => console.log(v), []);
-    const onUploadClick = useCallback(() => console.log("upload clicked"), []);
+    const onUploadFiles = useCallback(async (files: File[]) => {
+        await new Promise((r) => setTimeout(r, 1500));
+        console.log(
+            "업로드 완료 샘플",
+            files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+        );
+    }, []);
     const onHeaderReset = useCallback(() => console.log("reset clicked"), []);
     const onDownloadClick = useCallback(() => console.log("download Clicked"), []);
     const onCreateClick = useCallback(() => console.log("create"), []);
@@ -80,7 +86,7 @@ const App = () => {
                     header={header}
                     data={data}
                     onHeaderSave={onHeaderSave}
-                    onUploadClick={onUploadClick}
+                    onUploadFiles={onUploadFiles}
                     onHeaderReset={onHeaderReset}
                     onDownloadClick={onDownloadClick}
                     onCreateClick={onCreateClick}
