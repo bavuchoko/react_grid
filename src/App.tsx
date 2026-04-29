@@ -1,7 +1,7 @@
-import type {Header} from "./app/type/Type.ts";
+import type {Header, HeaderState} from "./app/type/Type.ts";
 import JsGrid from "./app/JsGrid.tsx";
 import {useCallback, useMemo, useState} from "react";
-import {removeRowsFromExcelGridData} from "./app/utils/removeRowsFromExcelGridData.ts";
+import {applyHeaderStateToGridHeader} from "./app/utils/applyHeaderStateToGridHeader.ts";
 
 const PAGE_SIZE = 15;
 const TOTAL_ELEMENTS = 150;
@@ -15,25 +15,21 @@ const MyCell = (props: any) => (
 
 const App = () => {
     const [pageNumber, setPageNumber] = useState(0);
-    const [deleteBusy, setDeleteBusy] = useState(false);
-    const header: Header[] = useMemo(
-        () => [
-            {key: "creator.name", label: "등록자", type: "string"},
-            {key: "state", label: "진행상태", type: "state"},
-            {key: "title", label: "제목", type: "string"},
-            {key: "number", label: "티켓번호", type: "string"},
-            {key: "createdAt", label: "등록일", type: "date"},
-            {key: "requester.name", label: "요청자", type: "string"},
-            {key: "score", label: "만족도", type: "score", render: <MyCell />},
-            {key: "deadLine.endBy", label: "만료일", type: "date"},
-            {key: "category.name", label: "카테고리", type: "string"},
-            {key: "updatedAt", label: "수정일", type: "date"},
-            {key: "transTo.title", label: "이관", type: "string"},
-        ],
-        [],
-    );
+    const [header, setHeader] = useState<Header[]>(() => [
+        {key: "creator.name", label: "등록자", type: "string"},
+        {key: "state", label: "진행상태", type: "state"},
+        {key: "title", label: "제목", type: "string"},
+        {key: "number", label: "티켓번호", type: "string"},
+        {key: "createdAt", label: "등록일", type: "date"},
+        {key: "requester.name", label: "요청자", type: "string"},
+        {key: "score", label: "만족도", type: "score", render: <MyCell />},
+        {key: "deadLine.endBy", label: "만료일", type: "date"},
+        {key: "category.name", label: "카테고리", type: "string"},
+        {key: "updatedAt", label: "수정일", type: "date"},
+        {key: "transTo.title", label: "이관", type: "string"},
+    ]);
 
-    const [data, setData] = useState(() => (
+    const [data] = useState(() => (
         Array.from({ length: PAGE_SIZE }, (_, i) => ({
             id: pageNumber * PAGE_SIZE + i + 1,
             creator: {name: "등록자"},
@@ -50,7 +46,18 @@ const App = () => {
         }))
     ));
 
-    const onHeaderSave = useCallback((v: unknown) => console.log(v), []);
+    const headerApi = useCallback(async (_payload: HeaderState[]) => {
+        await new Promise((r) => window.setTimeout(r, 300));
+        return true as const;
+    }, []);
+
+    const onHeaderSave = useCallback(
+        async (payload: HeaderState[]) => {
+            await headerApi(payload);
+            setHeader((prev) => applyHeaderStateToGridHeader({ header: prev, payload }));
+        },
+        [headerApi],
+    );
     const onUploadFiles = useCallback(async (files: File[]) => {
         await new Promise((r) => setTimeout(r, 1500));
         console.log(
@@ -74,13 +81,9 @@ const App = () => {
             .filter((id): id is number => typeof id === "number" && Number.isFinite(id));
         if (ids.length === 0) return;
 
-        setDeleteBusy(true);
-        try {
-            await deleteApi(ids);
-            setData((prev) => removeRowsFromExcelGridData({ data: prev, ids }));
-        } finally {
-            setDeleteBusy(false);
-        }
+        await deleteApi(ids);
+        // 실제 서비스라면 여기서 서버 재조회 후 `setData`를 한다.
+        console.log("삭제 완료, 이후 재조회 필요", ids);
     }, [deleteApi]);
 
 
@@ -115,7 +118,6 @@ const App = () => {
                     onDownloadClick={onDownloadClick}
                     onCreateClick={onCreateClick}
                     onDeleteClick={onDeleteClick}
-                    onDeleteBusy={deleteBusy}
                     onRowClick={onRowClick}
                     onPageChange={onPageChange}
                 />

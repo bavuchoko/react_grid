@@ -49,6 +49,7 @@ const JsGrid =(props:GridType)=> {
     const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
     const rootRef = useRef<HTMLDivElement | null>(null);
     const deleteSpinClass = useId().replace(/:/g, "");
+    const [deleteBusy, setDeleteBusy] = useState(false);
 
     const [userColumns, setUserColumns] = useState<UserColumn[]>([]);
 
@@ -274,15 +275,24 @@ const JsGrid =(props:GridType)=> {
         setSelectedRowIndexes(new Set());
     }
 
-    const prevDeleteBusyRef = useRef(Boolean(props.onDeleteBusy));
-    useEffect(() => {
-        const prev = prevDeleteBusyRef.current;
-        const curr = Boolean(props.onDeleteBusy);
-        if (prev && !curr) {
+    const handleDeleteSelected = useCallback(async () => {
+        if (deleteBusy) return;
+        if (!props.onDeleteClick) return;
+        const selectedRows = Array
+            .from(selectedRowIndexes)
+            .sort((a, b) => a - b)
+            .map((i) => data[i])
+            .filter((v) => v !== undefined);
+        if (selectedRows.length === 0) return;
+
+        setDeleteBusy(true);
+        try {
+            await Promise.resolve(props.onDeleteClick(selectedRows));
             setSelectedRowIndexes(new Set());
+        } finally {
+            setDeleteBusy(false);
         }
-        prevDeleteBusyRef.current = curr;
-    }, [props.onDeleteBusy]);
+    }, [deleteBusy, props.onDeleteClick, selectedRowIndexes, data]);
 
     const rowSelection = useMemo(() => {
         if (!showDelete) return undefined;
@@ -346,20 +356,9 @@ const JsGrid =(props:GridType)=> {
                     onToggleUploadPanel={props.onUploadFiles ? toggleUploadPanel : undefined}
                     uploadBusy={props.onUploadFiles ? uploadPanelBusy : undefined}
                     onCreateClick={props.onCreateClick}
-                    onTrashClick={
-                        props.onDeleteClick
-                            ? () => {
-                                const selectedRows = Array
-                                    .from(selectedRowIndexes)
-                                    .sort((a, b) => a - b)
-                                    .map((i) => data[i])
-                                    .filter((v) => v !== undefined);
-                                props.onDeleteClick?.(selectedRows);
-                            }
-                            : undefined
-                    }
-                    trashBusy={props.onDeleteBusy}
-                    trashDisabled={selectedRowIndexes.size === 0 || props.onDeleteBusy}
+                    onTrashClick={props.onDeleteClick ? handleDeleteSelected : undefined}
+                    trashBusy={deleteBusy}
+                    trashDisabled={selectedRowIndexes.size === 0 || deleteBusy}
                     onToggleFieldsMenu={(e) => {
                         e.stopPropagation();
                         if (uploadPanelBusy) return;
@@ -433,8 +432,8 @@ const JsGrid =(props:GridType)=> {
                 >
                     <div
                         style={{
-                            filter: props.onDeleteBusy ? "blur(2px)" : undefined,
-                            pointerEvents: props.onDeleteBusy ? "none" : undefined,
+                            filter: deleteBusy ? "blur(2px)" : undefined,
+                            pointerEvents: deleteBusy ? "none" : undefined,
                             transition: "filter 120ms ease",
                         }}
                     >
@@ -476,7 +475,7 @@ const JsGrid =(props:GridType)=> {
                             />
                         </div>
                     </div>
-                    {props.onDeleteBusy ? (
+                    {deleteBusy ? (
                         <div
                             style={{
                                 position: "absolute",

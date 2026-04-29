@@ -16,9 +16,7 @@ export type GridType ={
     /** 체크박스를 제외한 행 클릭 시 호출된다. */
     onRowClick?: (row: unknown) => void
     /** 전달 시 행 왼쪽에 체크박스·툴바 휴지통이 표시되고, 선택된 행의 "데이터 객체" 배열로 호출된다(1건이어도 배열). */
-    onDeleteClick?: (rows: unknown[]) => void
-    /** 삭제 요청 진행 중 여부. true면 휴지통 아이콘에 로딩 표시와 클릭 잠금을 적용한다. */
-    onDeleteBusy?: boolean
+    onDeleteClick?: (rows: unknown[]) => void | Promise<void>
     /** 전달 시 툴바에 연필 아이콘이 표시되고, 클릭 시 호출된다. */
     onCreateClick?: () => void
     /** false면 전체화면(pseudo fullscreen) 토글 UI/동작을 비활성화한다. (기본값: true) */
