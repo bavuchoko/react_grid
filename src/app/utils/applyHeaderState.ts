@@ -29,7 +29,6 @@ export function applyHeaderStateToHeader(args: {
         if (used.has(h.key)) continue;
         next.push(h);
     }
-
     return next;
 }
 

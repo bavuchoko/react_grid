@@ -1,7 +1,7 @@
 import type {Header, HeaderState} from "./app/type/Type.ts";
 import JsGrid from "./app/JsGrid.tsx";
 import {useCallback, useMemo, useState} from "react";
-import {applyHeaderStateToGridHeader} from "./app/utils/applyHeaderStateToGridHeader.ts";
+import {applyHeaderStateToHeader} from "./app/index.ts";
 
 const PAGE_SIZE = 15;
 const TOTAL_ELEMENTS = 150;
@@ -54,7 +54,7 @@ const App = () => {
     const onHeaderSave = useCallback(
         async (payload: HeaderState[]) => {
             await headerApi(payload);
-            setHeader((prev) => applyHeaderStateToGridHeader({ header: prev, payload }));
+            setHeader((prev) => applyHeaderStateToHeader({ header: prev, state: payload }));
         },
         [headerApi],
     );
