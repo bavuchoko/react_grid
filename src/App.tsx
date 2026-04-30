@@ -109,7 +109,7 @@ const App = () => {
         <div>
             <div style={{width: "700px", height: "800px", display: "flex", flexDirection: "column"}}>
                 <JsGrid
-                    style={{flex:'0 0 auto', maxHeight:'none'}}
+                    style={{flex: "1 1 auto", minHeight: 0, width: "100%"}}
                     header={header}
                     data={pageData}
                     onHeaderSave={onHeaderSave}

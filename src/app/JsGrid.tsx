@@ -432,6 +432,11 @@ const JsGrid =(props:GridType)=> {
                 >
                     <div
                         style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            flex: 1,
+                            minHeight: 0,
+                            height: "100%",
                             filter: deleteBusy ? "blur(2px)" : undefined,
                             pointerEvents: deleteBusy ? "none" : undefined,
                             transition: "filter 120ms ease",
