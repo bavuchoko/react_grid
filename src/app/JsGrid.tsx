@@ -12,6 +12,20 @@ import UploadFilePanel from "./js-grid/UploadFilePanel.tsx";
 import {useColumnWidths} from "./js-grid/useColumnWidths.ts";
 import {useFreezeColumns} from "./js-grid/useFreezeColumns.ts";
 
+function headerSaveErrorMessage(err: unknown): string {
+    if (err instanceof Error && err.message.trim()) return err.message;
+    const o = typeof err === "object" && err !== null ? (err as Record<string, unknown>) : null;
+    if (o && "response" in o && typeof o.response === "object" && o.response !== null) {
+        const rd = (o.response as Record<string, unknown>).data;
+        if (typeof rd === "string" && rd.trim()) return rd;
+        if (rd && typeof rd === "object") {
+            const m = (rd as Record<string, unknown>).message;
+            if (typeof m === "string" && m.trim()) return m;
+        }
+    }
+    return "컬럼 저장에 실패했습니다.";
+}
+
 const JsGrid =(props:GridType)=> {
     const data = props.data?.content ?? []
     const header = props.header;
@@ -123,6 +137,15 @@ const JsGrid =(props:GridType)=> {
     }, [userColumns, showDelete, header]);
 
     const [isFieldsMenuOpen, setIsFieldsMenuOpen] = useState(false);
+    const [fieldsSaveBusy, setFieldsSaveBusy] = useState(false);
+    const [fieldsSaveError, setFieldsSaveError] = useState<string | null>(null);
+    const fieldsSaveBusyRef = useRef(fieldsSaveBusy);
+    fieldsSaveBusyRef.current = fieldsSaveBusy;
+
+    useEffect(() => {
+        if (isFieldsMenuOpen) setFieldsSaveError(null);
+    }, [isFieldsMenuOpen]);
+
     const [fieldsMenuPos, setFieldsMenuPos] = useState<{ top: number; right: number } | null>(null);
     const fieldsBtnRef = useRef<HTMLDivElement | null>(null);
     const dragKeyRef = useRef<string | null>(null);
@@ -150,7 +173,9 @@ const JsGrid =(props:GridType)=> {
 
     useEffect(() => {
         if (!isFieldsMenuOpen) return;
+
         const onDown = (e: MouseEvent) => {
+            if (fieldsSaveBusyRef.current) return;
             const target = e.target as Node | null;
             if (!target) return;
             if (fieldsBtnRef.current?.contains(target)) return;
@@ -159,7 +184,10 @@ const JsGrid =(props:GridType)=> {
             setIsFieldsMenuOpen(false);
         };
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setIsFieldsMenuOpen(false);
+            if (e.key === 'Escape') {
+                if (fieldsSaveBusyRef.current) return;
+                setIsFieldsMenuOpen(false);
+            }
         };
         window.addEventListener('mousedown', onDown);
         window.addEventListener('keydown', onKey);
@@ -361,7 +389,7 @@ const JsGrid =(props:GridType)=> {
                     trashDisabled={selectedRowIndexes.size === 0 || deleteBusy}
                     onToggleFieldsMenu={(e) => {
                         e.stopPropagation();
-                        if (uploadPanelBusy) return;
+                        if (uploadPanelBusy || fieldsSaveBusy) return;
                         setIsUploadPanelOpen(false);
                         const rect = fieldsBtnRef.current?.getBoundingClientRect();
                         if (rect) {
@@ -392,6 +420,8 @@ const JsGrid =(props:GridType)=> {
                     pos={fieldsMenuPos}
                     userColumns={userColumns}
                     dragKeyRef={dragKeyRef}
+                    saveBusy={fieldsSaveBusy}
+                    saveError={fieldsSaveError}
                     onReorder={(fromKey, toKey) => {
                         setUserColumns((prev) => {
                             const fromIdx = prev.findIndex(x => x.key === fromKey);
@@ -407,6 +437,7 @@ const JsGrid =(props:GridType)=> {
                         setUserColumns((prev) => prev.map(x => x.key === key ? { ...x, visible } : x));
                     }}
                     onReset={() => {
+                        setFieldsSaveError(null);
                         setUserColumns(
                             headerList.map((c) => ({
                                 key: c.key,
@@ -416,10 +447,22 @@ const JsGrid =(props:GridType)=> {
                         );
                         props.onHeaderReset?.();
                     }}
-                    onSave={() => {
+                    onSave={async () => {
                         const payload: HeaderState[] = toHeaderState(userColumns, colWidthByKey);
-                        props.onHeaderSave?.(payload);
-                        setIsFieldsMenuOpen(false);
+                        if (!props.onHeaderSave) {
+                            setIsFieldsMenuOpen(false);
+                            return;
+                        }
+                        setFieldsSaveError(null);
+                        setFieldsSaveBusy(true);
+                        try {
+                            await props.onHeaderSave(payload);
+                            setIsFieldsMenuOpen(false);
+                        } catch (err) {
+                            setFieldsSaveError(headerSaveErrorMessage(err));
+                        } finally {
+                            setFieldsSaveBusy(false);
+                        }
                     }}
                 />
 

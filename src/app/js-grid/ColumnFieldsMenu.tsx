@@ -11,7 +11,9 @@ type Props = {
     onReorder: (fromKey: string, toKey: string) => void;
     onToggleVisible: (key: string, visible: boolean) => void;
     onReset: () => void;
-    onSave: () => void;
+    onSave: () => void | Promise<void>;
+    saveBusy?: boolean;
+    saveError?: string | null;
 };
 
 export default function ColumnFieldsMenu(props: Props) {
@@ -72,9 +74,26 @@ export default function ColumnFieldsMenu(props: Props) {
                 ))}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '16px 12px 2px' }}>
+            <div style={{ padding: '8px 12px 0' }}>
+                {props.saveError ? (
+                    <div
+                        role="alert"
+                        style={{
+                            marginBottom: 8,
+                            fontSize: 12,
+                            color: '#b91c1c',
+                            lineHeight: 1.35,
+                            wordBreak: 'break-word',
+                        }}
+                    >
+                        {props.saveError}
+                    </div>
+                ) : null}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '8px 12px 2px' }}>
                 <button
                     type="button"
+                    disabled={props.saveBusy}
                     onClick={props.onReset}
                     style={{
                         fontSize: 12,
@@ -82,7 +101,8 @@ export default function ColumnFieldsMenu(props: Props) {
                         border: '1px solid #bdc2c9',
                         backgroundColor: '#f8f8f8',
                         borderRadius: 6,
-                        cursor: 'pointer',
+                        cursor: props.saveBusy ? 'not-allowed' : 'pointer',
+                        opacity: props.saveBusy ? 0.6 : 1,
                         whiteSpace: 'nowrap',
                         display: 'flex',
                         alignItems: 'center',
@@ -94,7 +114,8 @@ export default function ColumnFieldsMenu(props: Props) {
 
                 <button
                     type="button"
-                    onClick={props.onSave}
+                    disabled={props.saveBusy}
+                    onClick={() => void props.onSave()}
                     style={{
                         fontSize: 12,
                         padding: '4px 8px',
@@ -102,14 +123,16 @@ export default function ColumnFieldsMenu(props: Props) {
                         backgroundColor: '#1d4ed8',
                         color: '#ffffff',
                         borderRadius: 6,
-                        cursor: 'pointer',
+                        cursor: props.saveBusy ? 'not-allowed' : 'pointer',
+                        opacity: props.saveBusy ? 0.85 : 1,
                         whiteSpace: 'nowrap',
                         display:"flex",
                         alignItems: 'center',
-                        width: '60px',
+                        minWidth: '60px',
                     }}
                 >
-                    <Disk style={{marginRight:'3px', width:'16px', }}/><span style={{fontSize:'12px'}}>저장</span>
+                    <Disk style={{marginRight:'3px', width:'16px', }}/>
+                    <span style={{fontSize:'12px'}}>{props.saveBusy ? '저장 중…' : '저장'}</span>
                 </button>
             </div>
         </div>

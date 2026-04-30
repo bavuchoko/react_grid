@@ -47,7 +47,7 @@ const App = () => {
     ));
 
     const headerApi = useCallback(async (_payload: HeaderState[]) => {
-        await new Promise((r) => window.setTimeout(r, 300));
+        await new Promise<void>((r) => window.setTimeout(r, 300));
         return true as const;
     }, []);
 
