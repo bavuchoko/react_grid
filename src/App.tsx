@@ -105,18 +105,20 @@ const App = () => {
         };
     }, [data, pageNumber]);
 
+    const isAdmin = true
+
     return (
         <div style={{height:'100%'}}>
             <JsGrid
                 // style={{flex: "1 1 0%", minHeight: 0, width: "100%"}}
                 header={header}
                 data={pageData}
-                onHeaderSave={onHeaderSave}
-                onUploadFiles={onUploadFiles}
+                onHeaderSave={isAdmin ? onHeaderSave : undefined}
+                onUploadFiles={isAdmin ? onUploadFiles : undefined}
                 onHeaderReset={onHeaderReset}
-                onDownloadClick={onDownloadClick}
-                onCreateClick={onCreateClick}
-                onDeleteClick={onDeleteClick}
+                onDownloadClick={isAdmin ? onDownloadClick : undefined}
+                onCreateClick={isAdmin ? onCreateClick : undefined}
+                onDeleteClick={isAdmin ? onDeleteClick : undefined}
                 onRowClick={onRowClick}
                 onPageChange={onPageChange}
             />
