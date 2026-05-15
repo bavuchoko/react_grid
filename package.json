@@ -1,20 +1,40 @@
 {
-  "name": "js-grid",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@bavuchoko/js-grid",
+  "version": "0.1.0",
+  "description": "React data grid (JsGrid) with toolbar, column layout, and pagination",
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:lib": "tsc -b && vite build --config vite.lib.config.ts",
+    "prepublishOnly": "npm run build:lib",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview --outDir dist-demo"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@bavuchoko/js-tooltip": "^0.1.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
   },
   "devDependencies": {
+    "@bavuchoko/js-tooltip": "^0.1.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
@@ -23,9 +43,18 @@
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.5.0",
+    "globals": "^17.5.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.10"
-  }
+    "vite": "^8.0.10",
+    "vite-plugin-dts": "^4.5.4"
+  },
+  "keywords": [
+    "react",
+    "grid",
+    "table",
+    "data-grid"
+  ]
 }
