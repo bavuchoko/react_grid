@@ -107,7 +107,7 @@ const App = () => {
 
     return (
         <div>
-            <div style={{width: "700px", height: "800px", display: "flex", flexDirection: "column"}}>
+            <div>
                 <JsGrid
                     style={{flex: "1 1 auto", minHeight: 0, width: "100%"}}
                     header={header}

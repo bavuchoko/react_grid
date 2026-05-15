@@ -68,7 +68,7 @@ export default function JsGridToolbar({
             `}</style>
             <div style={{display: 'flex', alignItems:'center', justifyContent:'space-between'}}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <ToolbarHint text="틀 고정 : alt + 헤더 클릭">
+                    <ToolbarHint text="헤더 고정 : alt + 헤더 클릭">
                         <ColumnLock style={{ width: '18px', cursor: 'default', opacity: 0.75 }} />
                     </ToolbarHint>
                 </div>

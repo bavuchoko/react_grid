@@ -28,6 +28,6 @@ export function getColumnFreezeStickyStyle(args: {
         backgroundColor: HIGHLIGHT_BG,
         backgroundClip: 'padding-box' as const,
         // 고정 하이라이트 영역의 세로 경계선을 배경과 동일 색으로 채워 비침을 막는다.
-        borderRight: isLastFrozen ? '3px solid #1d4ed8' : `1px solid ${HIGHLIGHT_BG}`,
+        borderRight: isLastFrozen ? '2px solid #1d4ed8' : `1px solid ${HIGHLIGHT_BG}`,
     };
 }
