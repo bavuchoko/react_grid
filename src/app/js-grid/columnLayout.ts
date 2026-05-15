@@ -1,10 +1,23 @@
-export function computeLeftOffsets(columns: readonly unknown[], colWidthByKey: Record<string, number>) {
+/**
+ * 고정 열 `sticky left` 합산.
+ * - `measuredByKey`: 헤더 셀 DOM 너비(우선).
+ * - `fallbackByKey`: 아직 측정 전이거나 0일 때 `header.width`/드래그 저장값.
+ * 두 값이 어긋나면 `left`가 실제보다 커져 열 사이에 빈 공간이 생길 수 있다.
+ */
+export function computeLeftOffsets(
+    columns: readonly unknown[],
+    measuredByKey: Record<string, number>,
+    fallbackByKey: Record<string, number>,
+) {
     const offsets: number[] = [];
     let acc = 0;
     for (let i = 0; i < columns.length; i++) {
         offsets[i] = acc;
         const key = String((columns[i] as any).key ?? i);
-        acc += colWidthByKey[key] ?? 0;
+        const m = measuredByKey[key];
+        const f = fallbackByKey[key];
+        const w = m != null && m > 0 ? m : f != null && f > 0 ? f : 0;
+        acc += w;
     }
     return offsets;
 }

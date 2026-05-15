@@ -1,6 +1,32 @@
-import {useCallback, useLayoutEffect, useRef, useState} from "react";
+import {useCallback, useLayoutEffect, useRef, useState, type MutableRefObject} from "react";
 import type {JsGridTableColumn} from "../type/Type.ts";
 import {COL_RESIZE_MAX_PX, COL_RESIZE_MIN_PX} from "./gridStyles.ts";
+
+function readHeaderCellWidths(
+    columns: readonly JsGridTableColumn[],
+    headerCellRefs: MutableRefObject<Array<HTMLTableCellElement | null>>,
+): Record<string, number> {
+    const next: Record<string, number> = {};
+    columns.forEach((col, idx) => {
+        const key = String(col.key ?? idx);
+        const el = headerCellRefs.current[idx];
+        const measured = el?.getBoundingClientRect().width ?? el?.offsetWidth ?? 0;
+        if (measured > 0) next[key] = Math.round(measured);
+    });
+    return next;
+}
+
+function sameWidthsForColumns(
+    a: Record<string, number>,
+    b: Record<string, number>,
+    columns: readonly JsGridTableColumn[],
+): boolean {
+    for (let i = 0; i < columns.length; i++) {
+        const key = String(columns[i].key ?? i);
+        if ((a[key] ?? 0) !== (b[key] ?? 0)) return false;
+    }
+    return true;
+}
 
 export function useColumnWidths(
     columns: readonly JsGridTableColumn[],
@@ -41,26 +67,27 @@ export function useColumnWidths(
 
             // 2) 측정값 갱신: 렌더된 실제 폭을 측정해 스티키 계산에 사용
             setMeasuredWidthByKey((prev) => {
-                const next: Record<string, number> = { ...prev };
-                const keysInCols = new Set<string>();
-                columns.forEach((col, idx) => {
-                    const key = String(col.key ?? idx);
-                    keysInCols.add(key);
-                    const el = headerCellRefs.current[idx];
-                    const measured =
-                        el?.getBoundingClientRect().width
-                        ?? el?.offsetWidth
-                        ?? 0;
-                    if (measured > 0) next[key] = Math.round(measured);
-                });
-                for (const k of Object.keys(next)) {
-                    if (!keysInCols.has(k)) delete next[k];
-                }
-                return next;
+                const next = readHeaderCellWidths(columns, headerCellRefs);
+                return sameWidthsForColumns(prev, next, columns) ? prev : next;
             });
         });
         return () => cancelAnimationFrame(id);
     }, [columns, headerWidthSig, persistedWidthByKey]);
+
+    /** 데이터·고정 스타일 등으로 헤더 셀 너비가 바뀌면 스티키 `left`를 다시 맞춘다. */
+    useLayoutEffect(() => {
+        const ro = new ResizeObserver(() => {
+            setMeasuredWidthByKey((prev) => {
+                const next = readHeaderCellWidths(columns, headerCellRefs);
+                return sameWidthsForColumns(prev, next, columns) ? prev : next;
+            });
+        });
+        for (let i = 0; i < columns.length; i++) {
+            const el = headerCellRefs.current[i];
+            if (el) ro.observe(el);
+        }
+        return () => ro.disconnect();
+    }, [columns]);
 
     return {
         headerCellRefs,

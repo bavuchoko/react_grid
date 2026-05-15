@@ -233,7 +233,7 @@ const JsGrid =(props:GridType)=> {
         headerWidthSig,
     );
 
-    const leftOffsets = useMemo(() => computeLeftOffsets(columns, measuredWidthByKey), [columns, measuredWidthByKey]);
+    const leftOffsets = useMemo(() => computeLeftOffsets(columns, measuredWidthByKey, colWidthByKey), [columns, measuredWidthByKey, colWidthByKey]);
 
     const getStickyStyle = useCallback((args: { colIndex: number; isHeader: boolean }) => {
         return getColumnFreezeStickyStyle({
