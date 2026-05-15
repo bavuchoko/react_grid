@@ -54,7 +54,10 @@ export default function JsGridToolbar({
     const trashSpinClass = useId().replace(/:/g, "");
 
     return (
-        <div style={{backgroundColor:'#f8f8f8', padding: '6px 12px', borderBottom: `1px solid #bdc2c9`, userSelect: "none", cursor: "default", flexShrink: 0, ...style}}>
+        <div
+            className="js-grid-toolbar"
+            style={{backgroundColor:'#f8f8f8', padding: '6px 12px', borderBottom: `1px solid #bdc2c9`, userSelect: "none", cursor: "default", flexShrink: 0, ...style}}
+        >
             <style>{`
                 @keyframes jsgrid-toolbar-spin-${uploadSpinClass} {
                     to { transform: rotate(360deg); }
@@ -69,14 +72,14 @@ export default function JsGridToolbar({
                     animation: jsgrid-toolbar-spin-${trashSpinClass} 0.75s linear infinite;
                 }
             `}</style>
-            <div style={{display: 'flex', alignItems:'center', justifyContent:'space-between'}}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="js-grid-toolbar-inner" style={{display: 'flex', alignItems:'center', justifyContent:'space-between'}}>
+                <div className="js-grid-toolbar-start" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <ToolbarHint text="헤더 고정 : alt + 헤더 클릭">
                         <ColumnLock style={{ width: '18px', cursor: 'default', opacity: 0.75 }} />
                     </ToolbarHint>
                 </div>
 
-                <div style={{display: 'flex', alignItems:'center', gap:'16px', justifyContent:'end'}}>
+                <div className="js-grid-toolbar-actions" style={{display: 'flex', alignItems:'center', gap:'16px', justifyContent:'end'}}>
 
                 {onCreateClick && (
                     <>

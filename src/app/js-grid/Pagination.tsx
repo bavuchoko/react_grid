@@ -66,6 +66,7 @@ export default function Pagination(props: Props) {
 
     return (
         <div
+            className="js-grid-pagination"
             style={{
                 height: 30,
                 borderTop: "1px solid rgb(189, 194, 201)",
@@ -75,7 +76,7 @@ export default function Pagination(props: Props) {
                 boxSizing: "border-box",
             }}
         >
-            <div style={{ display: "flex", alignItems: "center" }}>
+            <div className="js-grid-pagination-inner" style={{ display: "flex", alignItems: "center" }}>
                 <Prev
                     style={{ width: 18, height: 18, cursor: "pointer", color: "#111827" }}
                     onClick={() => {
@@ -92,7 +93,7 @@ export default function Pagination(props: Props) {
                     }}
                 />
 
-                <div style={{ display: "flex", marginLeft: 10, marginRight: 15, alignItems: "center" }}>
+                <div className="js-grid-pagination-page" style={{ display: "flex", marginLeft: 10, marginRight: 15, alignItems: "center" }}>
                     <input
                         ref={inputRef}
                         type="text"
@@ -146,6 +147,7 @@ export default function Pagination(props: Props) {
                 />
 
                 <div
+                    className="js-grid-pagination-total"
                     style={{
                         userSelect: "none",
                         display: "flex",
