@@ -27,6 +27,8 @@ type Props = {
     onTrashClick?: () => void;
     trashBusy?: boolean;
     trashDisabled?: boolean;
+    /** `onHeaderSave`를 넘긴 경우에만 컬럼(필드) 메뉴 버튼을 표시한다. */
+    showColumnFieldsMenu?: boolean;
     style?: CSSProperties;
 };
 
@@ -44,6 +46,7 @@ export default function JsGridToolbar({
     onTrashClick,
     trashBusy,
     trashDisabled,
+    showColumnFieldsMenu = false,
     style,
 }: Props) {
     const showPseudoFullscreen = enablePseudoFullscreen !== false;
@@ -203,17 +206,21 @@ export default function JsGridToolbar({
 
                     </>
                 )}
-                <div style={{borderLeft:'1px solid rgb(189, 194, 201)', height:'16px', margin:'0 2px'}} />
-                <div ref={fieldsBtnRef} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    <ToolbarHint text="컬럼 보이기/숨기기 및 순서 변경">
-                        <div
-                            style={{ display: 'inline-flex', alignItems: 'center' }}
-                            onClick={onToggleFieldsMenu}
-                        >
-                            <Fields style={{width:'18px', cursor: 'pointer'}}/>
+                {showColumnFieldsMenu ? (
+                    <>
+                        <div style={{borderLeft:'1px solid rgb(189, 194, 201)', height:'16px', margin:'0 2px'}} />
+                        <div ref={fieldsBtnRef} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                            <ToolbarHint text="컬럼 보이기/숨기기 및 순서 변경">
+                                <div
+                                    style={{ display: 'inline-flex', alignItems: 'center' }}
+                                    onClick={onToggleFieldsMenu}
+                                >
+                                    <Fields style={{width:'18px', cursor: 'pointer'}}/>
+                                </div>
+                            </ToolbarHint>
                         </div>
-                    </ToolbarHint>
-                </div>
+                    </>
+                ) : null}
 
                 {showPseudoFullscreen && (
                     isPseudoFullscreen ? (

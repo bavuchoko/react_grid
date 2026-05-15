@@ -376,6 +376,7 @@ const JsGrid =(props:GridType)=> {
                 `}</style>
                 <JsGridToolbar
                     fieldsBtnRef={fieldsBtnRef}
+                    showColumnFieldsMenu={Boolean(props.onHeaderSave)}
                     isPseudoFullscreen={isPseudoFullscreen}
                     enablePseudoFullscreen={enablePseudoFullscreen}
                     onDownLoadClick={props.onDownloadClick}
@@ -388,6 +389,7 @@ const JsGrid =(props:GridType)=> {
                     trashDisabled={selectedRowIndexes.size === 0 || deleteBusy}
                     onToggleFieldsMenu={(e) => {
                         e.stopPropagation();
+                        if (!props.onHeaderSave) return;
                         if (uploadPanelBusy || fieldsSaveBusy) return;
                         setIsUploadPanelOpen(false);
                         const rect = fieldsBtnRef.current?.getBoundingClientRect();
@@ -435,17 +437,21 @@ const JsGrid =(props:GridType)=> {
                     onToggleVisible={(key, visible) => {
                         setUserColumns((prev) => prev.map(x => x.key === key ? { ...x, visible } : x));
                     }}
-                    onReset={() => {
-                        setFieldsSaveError(null);
-                        setUserColumns(
-                            headerList.map((c) => ({
-                                key: c.key,
-                                label: String(c.label ?? c.key),
-                                visible: true,
-                            })),
-                        );
-                        props.onHeaderReset?.();
-                    }}
+                    onReset={
+                        props.onHeaderReset
+                            ? () => {
+                                setFieldsSaveError(null);
+                                setUserColumns(
+                                    headerList.map((c) => ({
+                                        key: c.key,
+                                        label: String(c.label ?? c.key),
+                                        visible: true,
+                                    })),
+                                );
+                                props.onHeaderReset?.();
+                            }
+                            : undefined
+                    }
                     onSave={async () => {
                         const payload: HeaderState[] = toHeaderState(userColumns, colWidthByKey);
                         if (!props.onHeaderSave) {

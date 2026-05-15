@@ -10,7 +10,8 @@ type Props = {
     dragKeyRef: MutableRefObject<string | null>;
     onReorder: (fromKey: string, toKey: string) => void;
     onToggleVisible: (key: string, visible: boolean) => void;
-    onReset: () => void;
+    /** `onHeaderReset`을 넘긴 경우에만 초기화 버튼을 표시한다. */
+    onReset?: () => void;
     onSave: () => void | Promise<void>;
     saveBusy?: boolean;
     saveError?: string | null;
@@ -91,26 +92,29 @@ export default function ColumnFieldsMenu(props: Props) {
                 ) : null}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '8px 12px 2px' }}>
-                <button
-                    type="button"
-                    disabled={props.saveBusy}
-                    onClick={props.onReset}
-                    style={{
-                        fontSize: 12,
-                        padding: '4px 8px',
-                        border: '1px solid #bdc2c9',
-                        backgroundColor: '#f8f8f8',
-                        borderRadius: 6,
-                        cursor: props.saveBusy ? 'not-allowed' : 'pointer',
-                        opacity: props.saveBusy ? 0.6 : 1,
-                        whiteSpace: 'nowrap',
-                        display: 'flex',
-                        alignItems: 'center',
-                        width: '70px',
-                    }}
-                >
-                    <Reset  style={{marginRight:'3px', width:'16px'}}/><span style={{fontSize:'12px'}}>초기화</span>
-                </button>
+                {props.onReset ? (
+                    <button
+                        type="button"
+                        disabled={props.saveBusy}
+                        onClick={props.onReset}
+                        style={{
+                            fontSize: 12,
+                            padding: '4px 8px',
+                            border: '1px solid #bdc2c9',
+                            backgroundColor: '#f8f8f8',
+                            borderRadius: 6,
+                            cursor: props.saveBusy ? 'not-allowed' : 'pointer',
+                            opacity: props.saveBusy ? 0.6 : 1,
+                            whiteSpace: 'nowrap',
+                            display: 'flex',
+                            alignItems: 'center',
+                            width: '70px',
+                        }}
+                    >
+                        <Reset style={{ marginRight: '3px', width: '16px' }} />
+                        <span style={{ fontSize: '12px' }}>초기화</span>
+                    </button>
+                ) : null}
 
                 <button
                     type="button"
