@@ -133,7 +133,7 @@ type Props = {
 
 export default function JsGridTable(props: Props) {
     return (
-        <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
             <table style={{ width: 'max-content', borderCollapse: 'separate', borderSpacing: 0 }}>
                 <thead style={{backgroundColor:'#f8f8f8'}}>
                     <tr>

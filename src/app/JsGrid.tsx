@@ -340,10 +340,9 @@ const JsGrid =(props:GridType)=> {
                     border: `1px solid ${GRID_BORDER}`,
                     borderBottom: 'none',
                     width: '100%',
-                    // 부모가 고정 height를 가질 때는 maxHeight:100%로 "부모 안"에 맞추고,
-                    // 내부 테이블 영역(JsGridTable wrapper)이 flex:1 + overflow:auto로 스크롤을 담당한다.
-                    // flex 레이아웃(부모가 display:flex)에서도 부모 높이를 따라가도록 한다.
-                    flex: '1 1 auto',
+                    // 부모가 높이를 주면(또는 flex 컬럼에서 flex:1) 전체 높이를 채운다.
+                    height: '100%',
+                    flex: '1 1 0%',
                     alignSelf: 'stretch',
                     maxHeight: '100%',
                     overflow: 'hidden',
@@ -468,8 +467,10 @@ const JsGrid =(props:GridType)=> {
 
                 <div
                     style={{
-                        flex: "1 1 auto",
+                        flex: "1 1 0%",
                         minHeight: 0,
+                        display: "flex",
+                        flexDirection: "column",
                         position: "relative",
                     }}
                 >
@@ -477,9 +478,9 @@ const JsGrid =(props:GridType)=> {
                         style={{
                             display: "flex",
                             flexDirection: "column",
-                            flex: 1,
+                            flex: "1 1 0%",
                             minHeight: 0,
-                            height: "100%",
+                            width: "100%",
                             filter: deleteBusy ? "blur(2px)" : undefined,
                             pointerEvents: deleteBusy ? "none" : undefined,
                             transition: "filter 120ms ease",
@@ -511,7 +512,7 @@ const JsGrid =(props:GridType)=> {
                                 });
                             }}
                         />
-                        <div style={{ flex: "0 0 auto" , backgroundColor: "rgb(248, 248, 248)",}}>
+                        <div style={{ flex: "0 0 auto", flexShrink: 0, backgroundColor: "rgb(248, 248, 248)" }}>
                             <Pagination
                                 page={{
                                     currentPage: currentPage0,

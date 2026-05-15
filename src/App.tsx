@@ -106,22 +106,20 @@ const App = () => {
     }, [data, pageNumber]);
 
     return (
-        <div>
-            <div>
-                <JsGrid
-                    style={{flex: "1 1 auto", minHeight: 0, width: "100%"}}
-                    header={header}
-                    data={pageData}
-                    onHeaderSave={onHeaderSave}
-                    onUploadFiles={onUploadFiles}
-                    onHeaderReset={onHeaderReset}
-                    onDownloadClick={onDownloadClick}
-                    onCreateClick={onCreateClick}
-                    onDeleteClick={onDeleteClick}
-                    onRowClick={onRowClick}
-                    onPageChange={onPageChange}
-                />
-            </div>
+        <div style={{height:'100%'}}>
+            <JsGrid
+                // style={{flex: "1 1 0%", minHeight: 0, width: "100%"}}
+                header={header}
+                data={pageData}
+                onHeaderSave={onHeaderSave}
+                onUploadFiles={onUploadFiles}
+                onHeaderReset={onHeaderReset}
+                onDownloadClick={onDownloadClick}
+                onCreateClick={onCreateClick}
+                onDeleteClick={onDeleteClick}
+                onRowClick={onRowClick}
+                onPageChange={onPageChange}
+            />
         </div>
     );
 };

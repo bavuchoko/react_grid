@@ -51,7 +51,7 @@ export default function JsGridToolbar({
     const trashSpinClass = useId().replace(/:/g, "");
 
     return (
-        <div style={{backgroundColor:'#f8f8f8', padding: '6px 12px', borderBottom: `1px solid #bdc2c9`, userSelect: "none", cursor: "default", ...style}}>
+        <div style={{backgroundColor:'#f8f8f8', padding: '6px 12px', borderBottom: `1px solid #bdc2c9`, userSelect: "none", cursor: "default", flexShrink: 0, ...style}}>
             <style>{`
                 @keyframes jsgrid-toolbar-spin-${uploadSpinClass} {
                     to { transform: rotate(360deg); }
