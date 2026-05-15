@@ -129,7 +129,7 @@ const JsGrid =(props:GridType)=> {
             .filter((c) => c.visible)
             .map((c) => {
                 const h = headerByKey.get(c.key);
-                return { key: c.key, label: c.label, render: h?.render };
+                return { key: c.key, label: c.label, type: h?.type, render: h?.render };
             });
         const rowNum = { key: "__rownum__", label: "#", __rownum__: true as const };
         const cb = { key: "__checkbox__", label: "", __checkbox__: true as const };

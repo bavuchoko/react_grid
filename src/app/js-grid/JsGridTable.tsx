@@ -1,4 +1,4 @@
-import {getValue, gridRowNumericId} from "../hook/CommonMethod.ts";
+import {getValue, gridRowNumericId, formatCellDisplayValue, resolveChildrenCellValue} from "../hook/CommonMethod.ts";
 import {CELL_MAX_WIDTH_PX, COL_RESIZE_MAX_PX, COL_RESIZE_MIN_PX, GRID_BORDER} from "./gridStyles.ts";
 import {computeRowNumber} from "./rowNumber.ts";
 import type {CSSProperties, Dispatch, MutableRefObject, ReactNode, SetStateAction} from "react";
@@ -344,7 +344,9 @@ export default function JsGridTable(props: Props) {
                                         rowIndexOnPage: rdex,
                                         fallbackPageSize: props.data.length,
                                     })
-                                    : getValue(row, column.key);
+                                    : column.type === "children"
+                                      ? resolveChildrenCellValue(row, column.key)
+                                      : getValue(row, column.key);
 
                                 const stopRowClick = (e: unknown) => {
                                     if (e && typeof e === "object" && "stopPropagation" in e) {
@@ -410,7 +412,7 @@ export default function JsGridTable(props: Props) {
                                         style={{ pointerEvents: 'none' }}
                                     />
                                 ) : (
-                                    (rendered ?? (value as any))
+                                    (rendered ?? formatCellDisplayValue(value))
                                 );
 
                                 return isCheckbox || isRowNum ? (

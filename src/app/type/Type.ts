@@ -56,10 +56,14 @@ export type GridCellRenderArgs = {
     stopRowClick: (e: unknown) => void;
 };
 
+export type DataType = 'string' | 'number' | 'state' | 'date' | 'score' | 'children';
+
 /** `JsGridTable` 컬럼 배열(행번호·체크박스 열 포함). `Header`와 동일한 `GridCellRenderArgs`를 사용한다. */
 export type JsGridTableColumn = {
     key: string;
     label: string;
+    /** `Header.type` — `children`이면 `key`를 `_` 기준으로 나눠 배열에서 `valueString`을 찾는다. */
+    type?: DataType;
     render?: ReactNode | ((args: GridCellRenderArgs) => ReactNode);
     __rownum__?: boolean;
     __checkbox__?: boolean;
@@ -91,8 +95,6 @@ export type Header ={
      */
     render?: ReactNode | ((args: GridCellRenderArgs) => ReactNode);
 }
-
-export type DataType = 'string' | 'number' | 'state' | 'date' | 'score';
 
 export type IconType ={
     style?:CSSProperties
