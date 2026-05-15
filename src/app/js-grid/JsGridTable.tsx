@@ -136,7 +136,7 @@ export default function JsGridTable(props: Props) {
         <div style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
             <table style={{ width: 'max-content', borderCollapse: 'separate', borderSpacing: 0 }}>
                 <thead style={{backgroundColor:'#f8f8f8'}}>
-                    <tr>
+                    <tr className="js-grid-head-row">
                         {props.columns.map((column, cdex) => {
                             const isRowNum = Boolean(column.__rownum__);
                             const isCheckbox = Boolean(column.__checkbox__);
@@ -149,6 +149,7 @@ export default function JsGridTable(props: Props) {
                             return (
                                 <th
                                     key={colKey}
+                                    className={`js-grid-th js-grid-col js-grid-col-${cdex}`}
                                     ref={(el) => { props.headerCellRefs.current[cdex] = el; }}
                                     onClick={(e) => {
                                         if ((e.target as HTMLElement).closest("[data-jsgrid-col-resize=\"1\"]")) return;
@@ -321,7 +322,11 @@ export default function JsGridTable(props: Props) {
                         return (
                         <tr
                             key={rowId ?? `r-${rdex}`}
-                            className={`border`}
+                            className={
+                                rowId != null
+                                    ? `border js-grid-body-row js-grid-row-idx-${rdex} js-grid-row-id-${rowId}`
+                                    : `border js-grid-body-row js-grid-row-idx-${rdex}`
+                            }
                             onClick={() => props.onRowClick?.(row)}
                             style={{ cursor: props.onRowClick ? 'pointer' : undefined }}
                         >
@@ -416,11 +421,21 @@ export default function JsGridTable(props: Props) {
                                 );
 
                                 return isCheckbox || isRowNum ? (
-                                    <td key={colKey} className="border h-[30px]" onClick={onTdClick} style={tdStyle}>
+                                    <td
+                                        key={colKey}
+                                        className={`border h-[30px] js-grid-row js-grid-col js-grid-col-${cdex}`}
+                                        onClick={onTdClick}
+                                        style={tdStyle}
+                                    >
                                         {tdChildren}
                                     </td>
                                 ) : (
-                                    <TruncatingTd key={colKey} className="border h-[30px]" onClick={onTdClick} style={tdStyle}>
+                                    <TruncatingTd
+                                        key={colKey}
+                                        className={`border h-[30px] js-grid-row js-grid-col js-grid-col-${cdex}`}
+                                        onClick={onTdClick}
+                                        style={tdStyle}
+                                    >
                                         {tdChildren}
                                     </TruncatingTd>
                                 );
