@@ -21,7 +21,8 @@ export function computeLeftOffsets(
         const key = String((columns[i] as any).key ?? i);
         const m = measuredByKey[key];
         const f = fallbackByKey[key];
-        const w = m != null && m > 0 ? m : f != null && f > 0 ? f : 0;
+        // 사용자·저장 너비(override)가 DOM 측정값보다 우선해야 드래그로 줄인 폭이 반영된다.
+        const w = f != null && f > 0 ? f : m != null && m > 0 ? m : 0;
         acc += w;
     }
     return offsets;

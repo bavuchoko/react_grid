@@ -28,6 +28,21 @@ function sameWidthsForColumns(
     return true;
 }
 
+/** DOM 측정값보다 사용자·저장 너비(override)를 우선한다. */
+function mergeMeasuredWithOverride(
+    measured: Record<string, number>,
+    override: Record<string, number>,
+    columns: readonly JsGridTableColumn[],
+): Record<string, number> {
+    const next = { ...measured };
+    columns.forEach((col, idx) => {
+        const key = String(col.key ?? idx);
+        const o = override[key];
+        if (o != null && o > 0) next[key] = o;
+    });
+    return next;
+}
+
 export function useColumnWidths(
     columns: readonly JsGridTableColumn[],
     persistedWidthByKey: Record<string, number>,
@@ -35,65 +50,72 @@ export function useColumnWidths(
     headerWidthSig: string,
 ) {
     const headerCellRefs = useRef<Array<HTMLTableCellElement | null>>([]);
-    /** 실제 레이아웃(스티키 계산)에 쓰는 측정값. */
     const [measuredWidthByKey, setMeasuredWidthByKey] = useState<Record<string, number>>({});
-    /** 저장된 width / 사용자가 드래그로 조정한 width만 들어가는 override 값. */
     const [overrideWidthByKey, setOverrideWidthByKey] = useState<Record<string, number>>({});
+    const overrideWidthRef = useRef(overrideWidthByKey);
+    overrideWidthRef.current = overrideWidthByKey;
     const prevSigRef = useRef<string | null>(null);
+
+    const applyMeasured = useCallback(
+        (raw: Record<string, number>) => {
+            const next = mergeMeasuredWithOverride(raw, overrideWidthRef.current, columns);
+            setMeasuredWidthByKey((prev) => (sameWidthsForColumns(prev, next, columns) ? prev : next));
+        },
+        [columns],
+    );
 
     const setColumnWidth = useCallback((columnKey: string, widthPx: number) => {
         const w = Math.round(Math.max(COL_RESIZE_MIN_PX, Math.min(COL_RESIZE_MAX_PX, widthPx)));
-        setOverrideWidthByKey((prev) => ({ ...prev, [columnKey]: w }));
-    }, []);
+        setOverrideWidthByKey((prev) => {
+            const next = { ...prev, [columnKey]: w };
+            overrideWidthRef.current = next;
+            setMeasuredWidthByKey((prevM) => {
+                const merged = mergeMeasuredWithOverride(prevM, next, columns);
+                return sameWidthsForColumns(prevM, merged, columns) ? prevM : merged;
+            });
+            return next;
+        });
+    }, [columns]);
 
     useLayoutEffect(() => {
         const id = requestAnimationFrame(() => {
             const sigChanged = prevSigRef.current !== headerWidthSig;
             prevSigRef.current = headerWidthSig;
 
-            // 1) override(저장값) 재적용: headerWidthSig가 바뀌면 persisted 기반으로 리셋
             if (sigChanged) {
-                setOverrideWidthByKey(() => ({ ...persistedWidthByKey }));
+                const nextOverride = { ...persistedWidthByKey };
+                overrideWidthRef.current = nextOverride;
+                setOverrideWidthByKey(nextOverride);
             } else {
-                // persisted가 새로 생긴 경우만 보강 (사용자 드래그 값은 유지)
                 setOverrideWidthByKey((prev) => {
                     const next = { ...prev };
                     for (const [k, v] of Object.entries(persistedWidthByKey)) {
                         if (!(k in next) && v > 0) next[k] = v;
                     }
+                    overrideWidthRef.current = next;
                     return next;
                 });
             }
 
-            // 2) 측정값 갱신: 렌더된 실제 폭을 측정해 스티키 계산에 사용
-            setMeasuredWidthByKey((prev) => {
-                const next = readHeaderCellWidths(columns, headerCellRefs);
-                return sameWidthsForColumns(prev, next, columns) ? prev : next;
-            });
+            applyMeasured(readHeaderCellWidths(columns, headerCellRefs));
         });
         return () => cancelAnimationFrame(id);
-    }, [columns, headerWidthSig, persistedWidthByKey]);
+    }, [columns, headerWidthSig, persistedWidthByKey, applyMeasured]);
 
-    /** 데이터·고정 스타일 등으로 헤더 셀 너비가 바뀌면 스티키 `left`를 다시 맞춘다. */
     useLayoutEffect(() => {
         const ro = new ResizeObserver(() => {
-            setMeasuredWidthByKey((prev) => {
-                const next = readHeaderCellWidths(columns, headerCellRefs);
-                return sameWidthsForColumns(prev, next, columns) ? prev : next;
-            });
+            applyMeasured(readHeaderCellWidths(columns, headerCellRefs));
         });
         for (let i = 0; i < columns.length; i++) {
             const el = headerCellRefs.current[i];
             if (el) ro.observe(el);
         }
         return () => ro.disconnect();
-    }, [columns]);
+    }, [columns, applyMeasured]);
 
     return {
         headerCellRefs,
-        /** 스타일 width 적용은 override만 */
         colWidthByKey: overrideWidthByKey,
-        /** 스티키 left 계산은 측정값 기반 */
         measuredWidthByKey,
         setColumnWidth,
     };

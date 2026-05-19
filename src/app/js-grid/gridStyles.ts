@@ -7,5 +7,6 @@ export const LINEAR_CELL_INNER_GAP = 2;
 export const LINEAR_DATA_CELL_PADDING_LEFT =
     LINEAR_CELL_PADDING_X + GRID_SORT_ICON_SLOT_PX + LINEAR_CELL_INNER_GAP;
 export const CELL_MAX_WIDTH_PX = 280;
-export const COL_RESIZE_MIN_PX = 64;
+/** 사용자가 헤더 드래그로 줄일 수 있는 최소 열 너비 */
+export const COL_RESIZE_MIN_PX = 120;
 export const COL_RESIZE_MAX_PX = 640;

@@ -4,7 +4,6 @@ import {
     COL_RESIZE_MAX_PX,
     COL_RESIZE_MIN_PX,
     GRID_SORT_ICON_SLOT_PX,
-    LINEAR_CELL_INNER_GAP,
     LINEAR_CELL_PADDING_X,
 } from "./gridStyles.ts";
 import {computeRowNumber} from "./rowNumber.ts";
@@ -26,6 +25,7 @@ function colWidthCss(wPx: number | null | undefined): CSSProperties {
         ["--js-grid-col-width" as string]: px,
         width: "var(--js-grid-col-width)",
         maxWidth: "var(--js-grid-col-width)",
+        minWidth: `${COL_RESIZE_MIN_PX}px`,
     };
 }
 
@@ -93,10 +93,13 @@ function HeaderColumnResizeHandle({
     minPx,
     maxPx,
     onResize,
+    showGrip,
 }: {
     minPx: number;
     maxPx: number;
     onResize: (widthPx: number) => void;
+    /** `linear` 등 border 없는 테마에서 열 경계 `|` 표시 */
+    showGrip?: boolean;
 }) {
     const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -119,6 +122,7 @@ function HeaderColumnResizeHandle({
     };
     return (
         <div
+            className="js-grid-col-resize"
             data-jsgrid-col-resize="1"
             role="separator"
             aria-orientation="vertical"
@@ -129,13 +133,22 @@ function HeaderColumnResizeHandle({
                 right: 0,
                 top: 0,
                 bottom: 0,
-                width: 6,
+                width: showGrip ? 10 : 6,
                 cursor: "col-resize",
                 zIndex: 8,
                 touchAction: "none",
                 marginRight: -1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
             }}
-        />
+        >
+            {showGrip ? (
+                <span className="js-grid-col-resize-grip" aria-hidden>
+                    |
+                </span>
+            ) : null}
+        </div>
     );
 }
 
@@ -231,26 +244,24 @@ export default function JsGridTable(props: Props) {
                                             isLinear && !isCheckbox && !isRowNum
                                                 ? LINEAR_CELL_PADDING_X
                                                 : undefined,
-                                        ...(intrinsicLabelCol
-                                            ? {
-                                                minWidth: 'max-content',
-                                                maxWidth: 'none',
-                                                width: undefined,
-                                                overflow: 'hidden',
-                                                textOverflow: 'clip',
-                                                whiteSpace: 'nowrap',
-                                            }
-                                            : {
-                                                minWidth: isCheckbox ? '40px' : isRowNum ? '56px' : '80px',
-                                                ...(hasW
-                                                    ? colWidthCss(wPx)
-                                                    : isCheckbox || isRowNum
-                                                      ? {}
-                                                      : { maxWidth: CELL_MAX_WIDTH_PX }),
-                                                overflow: isCheckbox || isRowNum ? undefined : 'hidden',
-                                                textOverflow: isCheckbox || isRowNum ? undefined : 'ellipsis',
-                                                whiteSpace: isCheckbox || isRowNum ? undefined : 'nowrap',
-                                            }),
+                                        ...(hasW
+                                            ? colWidthCss(wPx)
+                                            : isCheckbox || isRowNum
+                                              ? {
+                                                  minWidth: isCheckbox ? '40px' : '56px',
+                                              }
+                                              : {
+                                                  minWidth: COL_RESIZE_MIN_PX,
+                                                  maxWidth: CELL_MAX_WIDTH_PX,
+                                                  overflow: 'hidden',
+                                                  textOverflow: 'ellipsis',
+                                                  whiteSpace: 'nowrap',
+                                              }),
+                                        ...(isCheckbox || isRowNum
+                                            ? {}
+                                            : hasW
+                                              ? { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                                              : {}),
                                         ...props.getStickyStyle({ colIndex: cdex, isHeader: true }),
                                     }}
                                 >
@@ -270,12 +281,13 @@ export default function JsGridTable(props: Props) {
                                         className="js-grid-cell-inner"
                                         style={{
                                             justifyContent: isRowNum ? 'center' : isLinear ? 'flex-start' : 'center',
-                                            paddingLeft: isLinear ? 0 : 6,
-                                            paddingRight: 6,
+                                            paddingLeft: isLinear ? 0 : undefined,
+                                            paddingRight: isLinear ? 6 : undefined,
                                             gap: 2,
                                         }}
                                     >
-                                        {!isRowNum && (
+                                        {/* basic: 오른쪽 sort 아이콘과 대칭되는 왼쪽 빈 칸 → 제목 가운데 정렬 */}
+                                        {!isRowNum && !isLinear && (
                                             <span
                                                 style={{
                                                     display: 'inline-block',
@@ -288,23 +300,13 @@ export default function JsGridTable(props: Props) {
                                             />
                                         )}
                                         <span
-                                            style={
-                                                intrinsicLabelCol
-                                                    ? {
-                                                        whiteSpace: 'nowrap',
-                                                        flex: '0 0 auto',
-                                                        flexShrink: 0,
-                                                        minWidth: 'max-content',
-                                                        width: 'max-content',
-                                                        overflow: 'visible',
-                                                    }
-                                                    : {
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        whiteSpace: 'nowrap',
-                                                        minWidth: 0,
-                                                    }
-                                            }
+                                            style={{
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                                minWidth: 0,
+                                                flex: intrinsicLabelCol ? '1 1 auto' : undefined,
+                                            }}
                                         >
                                             {column.label}
                                         </span>
@@ -365,6 +367,7 @@ export default function JsGridTable(props: Props) {
                                         <HeaderColumnResizeHandle
                                             minPx={COL_RESIZE_MIN_PX}
                                             maxPx={COL_RESIZE_MAX_PX}
+                                            showGrip={isLinear}
                                             onResize={(w) => props.onColumnWidthChange?.(column.key, w)}
                                         />
                                     ) : null}
@@ -415,9 +418,7 @@ export default function JsGridTable(props: Props) {
                                 const isCheckbox = Boolean(column.__checkbox__);
                                 const colKey = String(column.key ?? cdex);
                                 const wPx = props.colWidthByKey[colKey];
-                                const isDataCol = !isCheckbox && !isRowNum;
                                 const hasW = wPx != null && wPx > 0;
-                                const intrinsicDataCol = isDataCol && !hasW;
                                 const value = isCheckbox
                                     ? null
                                     : column.__rownum__
@@ -455,21 +456,18 @@ export default function JsGridTable(props: Props) {
                                 const tdStyle: CSSProperties = {
                                     ...rowStripe,
                                     ...cellBorders,
-                                    ...(hasW ? colWidthCss(wPx) : {}),
-                                    minWidth: isCheckbox ? '40px' : isRowNum ? '56px' : undefined,
-                                    maxWidth:
-                                        isCheckbox || isRowNum
-                                            ? undefined
-                                            : intrinsicDataCol
-                                              ? undefined
-                                              : hasW
-                                                ? undefined
-                                                : CELL_MAX_WIDTH_PX,
+                                    ...(hasW
+                                        ? colWidthCss(wPx)
+                                        : isCheckbox || isRowNum
+                                          ? { minWidth: isCheckbox ? '40px' : '56px' }
+                                          : {
+                                              minWidth: COL_RESIZE_MIN_PX,
+                                              maxWidth: CELL_MAX_WIDTH_PX,
+                                          }),
                                     boxSizing: 'border-box',
                                     whiteSpace: 'nowrap',
                                     overflow: isCheckbox || isRowNum ? undefined : 'hidden',
-                                    textOverflow:
-                                        intrinsicDataCol ? 'clip' : isCheckbox || isRowNum ? undefined : 'ellipsis',
+                                    textOverflow: isCheckbox || isRowNum ? undefined : 'ellipsis',
                                     textAlign: isCheckbox ? 'center' : isRowNum ? 'right' : undefined,
                                     paddingRight: isCheckbox ? undefined : LINEAR_CELL_PADDING_X,
                                     paddingLeft: isCheckbox
@@ -503,30 +501,6 @@ export default function JsGridTable(props: Props) {
                                         readOnly
                                         style={{ pointerEvents: 'none' }}
                                     />
-                                ) : isLinear && isDataCol ? (
-                                    <div className="js-grid-cell-inner" style={{ gap: LINEAR_CELL_INNER_GAP }}>
-                                        <span
-                                            style={{
-                                                display: 'inline-block',
-                                                flexShrink: 0,
-                                                width: SORT_ICON_PX,
-                                                minWidth: SORT_ICON_PX,
-                                                height: 1,
-                                            }}
-                                            aria-hidden
-                                        />
-                                        <span
-                                            style={{
-                                                minWidth: 0,
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap',
-                                                flex: '1 1 auto',
-                                            }}
-                                        >
-                                            {cellText}
-                                        </span>
-                                    </div>
                                 ) : (
                                     <div className="js-grid-cell-inner">{cellText}</div>
                                 );
