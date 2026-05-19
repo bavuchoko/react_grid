@@ -19,6 +19,21 @@ export type {JsGridTableColumn} from "../type/Type.ts";
 
 const SORT_ICON_PX = GRID_SORT_ICON_SLOT_PX;
 
+function gridColClassNames(
+    cdex: number,
+    column: Pick<JsGridTableColumn, "__checkbox__" | "__rownum__">,
+    role: "th" | "td",
+): string {
+    const parts = [
+        role === "th" ? "js-grid-th" : "js-grid-row",
+        "js-grid-col",
+        `js-grid-col-${cdex}`,
+    ];
+    if (column.__checkbox__) parts.push("js-grid-chk");
+    if (column.__rownum__) parts.push("js-grid-idx");
+    return parts.join(" ");
+}
+
 type TruncatingTdProps = React.TdHTMLAttributes<HTMLTableCellElement> & {
     children: ReactNode;
 };
@@ -163,7 +178,7 @@ export default function JsGridTable(props: Props) {
                             return (
                                 <th
                                     key={colKey}
-                                    className={`js-grid-th js-grid-col js-grid-col-${cdex}`}
+                                    className={gridColClassNames(cdex, column, "th")}
                                     ref={(el) => { props.headerCellRefs.current[cdex] = el; }}
                                     onClick={(e) => {
                                         if ((e.target as HTMLElement).closest("[data-jsgrid-col-resize=\"1\"]")) return;
@@ -226,6 +241,7 @@ export default function JsGridTable(props: Props) {
                                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                             <input
                                                 type="checkbox"
+                                                className="js-grid-chk-box"
                                                 checked={props.rowSelection.headerChecked}
                                                 disabled={props.rowSelection.pageRowIds.length === 0}
                                                 readOnly
@@ -451,6 +467,7 @@ export default function JsGridTable(props: Props) {
                                 const tdChildren = isCheckbox && props.rowSelection ? (
                                     <input
                                         type="checkbox"
+                                        className="js-grid-chk-box"
                                         checked={props.rowSelection.selectedIds.has(rdex)}
                                         readOnly
                                         style={{ pointerEvents: 'none' }}
@@ -494,7 +511,7 @@ export default function JsGridTable(props: Props) {
                                 return isCheckbox || isRowNum ? (
                                     <td
                                         key={colKey}
-                                        className={`${bodyCellClass} js-grid-row js-grid-col js-grid-col-${cdex}`}
+                                        className={`${bodyCellClass} ${gridColClassNames(cdex, column, "td")}`}
                                         onClick={onTdClick}
                                         style={tdStyle}
                                     >
@@ -503,7 +520,7 @@ export default function JsGridTable(props: Props) {
                                 ) : (
                                     <TruncatingTd
                                         key={colKey}
-                                        className={`${bodyCellClass} js-grid-row js-grid-col js-grid-col-${cdex}`}
+                                        className={`${bodyCellClass} ${gridColClassNames(cdex, column, "td")}`}
                                         onClick={onTdClick}
                                         style={tdStyle}
                                     >
