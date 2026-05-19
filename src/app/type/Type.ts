@@ -31,6 +31,8 @@ export type GridType ={
     onPageChange?: (pageable: Page) => void
     /** 생략·`basic`은 기본 스타일. `linear`는 툴바·헤더 흰 배경, 본문 홀수 행(1·3·5…) 줄무늬. */
     theme?: JsGridTheme
+    /** `true`일 때만 헤더에서 열 너비 드래그·리사이즈 핸들(`|`)이 표시·동작한다. */
+    resizable?: boolean
     style?: CSSProperties
 }
 

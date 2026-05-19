@@ -508,7 +508,7 @@ const JsGrid =(props:GridType)=> {
                             sortDir={sortDir}
                             headerCellRefs={headerCellRefs}
                             colWidthByKey={colWidthByKey}
-                            onColumnWidthChange={setColumnWidth}
+                            onColumnWidthChange={props.resizable ? setColumnWidth : undefined}
                             setFreezeUntilIndex={setFreezeUntilIndex}
                             getStickyStyle={getStickyStyle}
                             rowSelection={rowSelection}

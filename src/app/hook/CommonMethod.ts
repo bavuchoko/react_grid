@@ -64,7 +64,7 @@ export function formatCellDisplayValue(value: unknown): string {
         if (typeof o.title === "string" && o.title.trim()) return o.title;
         try {
             const s = JSON.stringify(value);
-            return s.length > 120 ? `${s.slice(0, 117)}...` : s;
+            return s.length > 130 ? `${s.slice(0, 117)}...` : s;
         } catch {
             return "";
         }

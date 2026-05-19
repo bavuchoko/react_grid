@@ -2175,7 +2175,8 @@ const App = () => {
     return (
         <div style={{height:'700px', width:'1400px', paddingLeft:'10px'}}>
             <JsGrid
-                // theme={'linear'}
+                resizable={true}
+                theme={'linear'}
                 // style={{flex: "1 1 0%", minHeight: 0, width: "100%"}}
                 header={header}
                 data={pageData}
