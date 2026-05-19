@@ -160,10 +160,19 @@ export default function JsGridTable(props: Props) {
     const isLinear = resolveJsGridTheme(props.theme) === "linear";
     const cellBorders = gridThemeCellBorders(props.theme);
     const bodyCellClass = isLinear ? "h-[30px]" : "border h-[30px]";
+    const isEmpty = props.data.length === 0;
+    const colCount = props.columns.length;
 
     return (
         <div style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
-            <table style={{ width: 'max-content', borderCollapse: 'separate', borderSpacing: 0 }}>
+            <table
+                style={{
+                    width: isEmpty ? '100%' : 'max-content',
+                    minWidth: isEmpty ? '100%' : undefined,
+                    borderCollapse: 'separate',
+                    borderSpacing: 0,
+                }}
+            >
                 <thead style={{backgroundColor: themeStyles.headerBg}}>
                     <tr className="js-grid-head-row">
                         {props.columns.map((column, cdex) => {
@@ -360,7 +369,28 @@ export default function JsGridTable(props: Props) {
                 </thead>
 
                 <tbody>
-                    {props.data.map((row, rdex) => {
+                    {isEmpty ? (
+                        <tr className="js-grid-empty-row">
+                            <td
+                                colSpan={colCount > 0 ? colCount : 1}
+                                className="js-grid-empty"
+                            >
+                                <div
+                                    className="js-grid-empty-message"
+                                    style={{
+                                        padding: '48px 16px',
+                                        textAlign: 'center',
+                                        color: '#6b7280',
+                                        fontSize: 14,
+                                        userSelect: 'none',
+                                    }}
+                                >
+                                    데이터가 없습니다
+                                </div>
+                            </td>
+                        </tr>
+                    ) : null}
+                    {!isEmpty && props.data.map((row, rdex) => {
                         const rowId = gridRowNumericId(row);
                         const rowClass = isLinear ? "js-grid-body-row" : "border js-grid-body-row";
                         return (
