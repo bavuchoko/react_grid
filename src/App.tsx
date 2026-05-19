@@ -2173,9 +2173,9 @@ const App = () => {
     const isAdmin = true
 
     return (
-        <div style={{height:'100%', width:'80%', paddingLeft:'10px'}}>
+        <div style={{height:'700px', width:'1400px', paddingLeft:'10px'}}>
             <JsGrid
-                theme="linear"
+                theme={'linear'}
                 // style={{flex: "1 1 0%", minHeight: 0, width: "100%"}}
                 header={header}
                 data={pageData}

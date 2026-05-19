@@ -12,3 +12,7 @@ body {
 table th tr td{
   border-collapse: collapse;
 }
+
+.js-grid-col{
+  height: 40px !important;
+}

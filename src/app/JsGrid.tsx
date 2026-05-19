@@ -11,6 +11,7 @@ import UploadFilePanel from "./js-grid/UploadFilePanel.tsx";
 import {useColumnWidths} from "./js-grid/useColumnWidths.ts";
 import {useFreezeColumns} from "./js-grid/useFreezeColumns.ts";
 import {gridThemeContainerBorder, resolveJsGridTheme} from "./js-grid/gridTheme.ts";
+import "./js-grid/js-grid-layout.css";
 
 function headerSaveErrorMessage(err: unknown): string {
     if (err instanceof Error && err.message.trim()) return err.message;
@@ -479,6 +480,7 @@ const JsGrid =(props:GridType)=> {
                     style={{
                         flex: "1 1 0%",
                         minHeight: 0,
+                        minWidth: 0,
                         display: "flex",
                         flexDirection: "column",
                         position: "relative",
@@ -490,6 +492,7 @@ const JsGrid =(props:GridType)=> {
                             flexDirection: "column",
                             flex: "1 1 0%",
                             minHeight: 0,
+                            minWidth: 0,
                             width: "100%",
                             filter: deleteBusy ? "blur(2px)" : undefined,
                             pointerEvents: deleteBusy ? "none" : undefined,

@@ -1,3 +1,8 @@
+import {gridThemeShowsBorders} from "./gridTheme.ts";
+
+const FREEZE_HIGHLIGHT_BG = "rgb(219, 234, 254)";
+const FREEZE_LAST_BORDER = "2px solid #1d4ed8";
+
 /**
  * 고정 열 `sticky left` 합산.
  * - `measuredByKey`: 헤더 셀 DOM 너비(우선).
@@ -22,8 +27,6 @@ export function computeLeftOffsets(
     return offsets;
 }
 
-import {gridThemeShowsBorders} from "./gridTheme.ts";
-
 export function getColumnFreezeStickyStyle(args: {
     colIndex: number;
     isHeader: boolean;
@@ -34,19 +37,19 @@ export function getColumnFreezeStickyStyle(args: {
     const { colIndex, isHeader, freezeUntilIndex, leftOffsets, theme } = args;
     if (freezeUntilIndex == null || colIndex > freezeUntilIndex) return undefined;
     const isLastFrozen = colIndex === freezeUntilIndex;
-    const HIGHLIGHT_BG = 'rgb(219, 234, 254)';
     const showBorders = gridThemeShowsBorders(theme);
     return {
-        position: 'sticky' as const,
+        position: "sticky" as const,
         left: leftOffsets[colIndex] ?? 0,
         top: isHeader ? 0 : undefined,
         zIndex: isHeader ? 5 : 3,
-        // 반투명 배경이면 스크롤 시 뒤 내용이 비쳐 보일 수 있어 불투명으로 고정한다.
-        backgroundColor: HIGHLIGHT_BG,
-        backgroundClip: 'padding-box' as const,
-        // 고정 하이라이트 영역의 세로 경계선을 배경과 동일 색으로 채워 비침을 막는다.
-        borderRight: showBorders
-            ? (isLastFrozen ? '2px solid #1d4ed8' : `1px solid ${HIGHLIGHT_BG}`)
-            : 'none',
+        backgroundColor: FREEZE_HIGHLIGHT_BG,
+        backgroundClip: "padding-box" as const,
+        // `linear`는 셀 border를 끄지만, 고정 구간 끝(마지막 고정 열) 구분선은 유지한다.
+        borderRight: isLastFrozen
+            ? FREEZE_LAST_BORDER
+            : showBorders
+              ? `1px solid ${FREEZE_HIGHLIGHT_BG}`
+              : "none",
     };
 }
