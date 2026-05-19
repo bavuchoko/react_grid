@@ -1,4 +1,5 @@
 import type {CSSProperties, ReactNode} from "react";
+import type {JsGridTheme} from "../js-grid/gridTheme.ts";
 
 export type GridType ={
     data?: Data
@@ -28,6 +29,8 @@ export type GridType ={
      * - `sort`는 `property,direction` 형태(예: `createdAt,desc`)를 권장
      */
     onPageChange?: (pageable: Page) => void
+    /** 생략·`basic`은 기본 스타일. `linear`는 툴바·헤더 흰 배경, 본문 홀수 행(1·3·5…) 줄무늬. */
+    theme?: JsGridTheme
     style?: CSSProperties
 }
 

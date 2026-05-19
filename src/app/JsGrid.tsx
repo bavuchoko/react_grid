@@ -3,7 +3,6 @@ import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react";
 import ColumnFieldsMenu from "./js-grid/ColumnFieldsMenu.tsx";
 import {toHeaderState, type UserColumn} from "./js-grid/columnFieldsMenuModel.ts";
 import {computeLeftOffsets, getColumnFreezeStickyStyle} from "./js-grid/columnLayout.ts";
-import {GRID_BORDER} from "./js-grid/gridStyles.ts";
 import JsGridTable from "./js-grid/JsGridTable.tsx";
 import JsGridToolbar from "./js-grid/JsGridToolbar.tsx";
 import Pagination from "./js-grid/Pagination.tsx";
@@ -11,6 +10,7 @@ import { DEFAULT_EXCEL_UPLOAD_ACCEPT } from "./js-grid/excelUploadConstraints.ts
 import UploadFilePanel from "./js-grid/UploadFilePanel.tsx";
 import {useColumnWidths} from "./js-grid/useColumnWidths.ts";
 import {useFreezeColumns} from "./js-grid/useFreezeColumns.ts";
+import {gridThemeContainerBorder, resolveJsGridTheme} from "./js-grid/gridTheme.ts";
 
 function headerSaveErrorMessage(err: unknown): string {
     if (err instanceof Error && err.message.trim()) return err.message;
@@ -241,8 +241,9 @@ const JsGrid =(props:GridType)=> {
             isHeader: args.isHeader,
             freezeUntilIndex,
             leftOffsets,
+            theme: props.theme,
         });
-    }, [freezeUntilIndex, leftOffsets]);
+    }, [freezeUntilIndex, leftOffsets, props.theme]);
 
     const totalPages = page.totalPages ?? 1;
     const currentPage0 = page.pageNumber ?? 0;
@@ -333,12 +334,14 @@ const JsGrid =(props:GridType)=> {
         };
     }, [showDelete, pageRowIds, selectedRowIndexes, headerChecked, toggleSelectAll, toggleSelectRow]);
 
+    const gridTheme = resolveJsGridTheme(props.theme);
+
     return (
             <div
+                className={`js-grid-container js-grid-theme-${gridTheme}`}
                 ref={rootRef}
                 style={{
-                    border: `1px solid ${GRID_BORDER}`,
-                    borderBottom: 'none',
+                    ...gridThemeContainerBorder(props.theme),
                     width: '100%',
                     // 부모가 높이를 주면(또는 flex 컬럼에서 flex:1) 전체 높이를 채운다.
                     height: '100%',
@@ -375,6 +378,7 @@ const JsGrid =(props:GridType)=> {
                     }
                 `}</style>
                 <JsGridToolbar
+                    theme={props.theme}
                     fieldsBtnRef={fieldsBtnRef}
                     showColumnFieldsMenu={Boolean(props.onHeaderSave)}
                     isPseudoFullscreen={isPseudoFullscreen}
@@ -493,6 +497,7 @@ const JsGrid =(props:GridType)=> {
                         }}
                     >
                         <JsGridTable
+                            theme={props.theme}
                             columns={columns}
                             data={data}
                             page={page}
@@ -518,8 +523,9 @@ const JsGrid =(props:GridType)=> {
                                 });
                             }}
                         />
-                        <div style={{ flex: "0 0 auto", flexShrink: 0, backgroundColor: "rgb(248, 248, 248)" }}>
+                        <div style={{ flex: "0 0 auto", flexShrink: 0, backgroundColor: gridTheme === "linear" ? "#ffffff" : "rgb(248, 248, 248)" }}>
                             <Pagination
+                                theme={props.theme}
                                 page={{
                                     currentPage: currentPage0,
                                     totalPages,

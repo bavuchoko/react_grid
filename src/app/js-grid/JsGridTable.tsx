@@ -1,15 +1,23 @@
 import {getValue, gridRowNumericId, formatCellDisplayValue, resolveChildrenCellValue} from "../hook/CommonMethod.ts";
-import {CELL_MAX_WIDTH_PX, COL_RESIZE_MAX_PX, COL_RESIZE_MIN_PX, GRID_BORDER} from "./gridStyles.ts";
+import {
+    CELL_MAX_WIDTH_PX,
+    COL_RESIZE_MAX_PX,
+    COL_RESIZE_MIN_PX,
+    GRID_SORT_ICON_SLOT_PX,
+    LINEAR_CELL_INNER_GAP,
+    LINEAR_CELL_PADDING_X,
+} from "./gridStyles.ts";
 import {computeRowNumber} from "./rowNumber.ts";
 import type {CSSProperties, Dispatch, MutableRefObject, ReactNode, SetStateAction} from "react";
 import React, {isValidElement, useCallback, useLayoutEffect, useRef, useState} from "react";
 import type {JsGridTableColumn, Page} from "../type/Type.ts";
 import ASC from "../resources/icon/ASC.tsx";
 import DESC from "../resources/icon/DESC.tsx";
+import {gridThemeCellBorders, gridThemeStyles, resolveJsGridTheme, type JsGridTheme} from "./gridTheme.ts";
 
 export type {JsGridTableColumn} from "../type/Type.ts";
 
-const SORT_ICON_PX = 14;
+const SORT_ICON_PX = GRID_SORT_ICON_SLOT_PX;
 
 type TruncatingTdProps = React.TdHTMLAttributes<HTMLTableCellElement> & {
     children: ReactNode;
@@ -129,13 +137,19 @@ type Props = {
     rowSelection?: RowSelectionProps;
     onRowClick?: (row: unknown) => void;
     onColumnWidthChange?: (columnKey: string, widthPx: number) => void;
+    theme?: JsGridTheme | string;
 };
 
 export default function JsGridTable(props: Props) {
+    const themeStyles = gridThemeStyles(props.theme);
+    const isLinear = resolveJsGridTheme(props.theme) === "linear";
+    const cellBorders = gridThemeCellBorders(props.theme);
+    const bodyCellClass = isLinear ? "h-[30px]" : "border h-[30px]";
+
     return (
         <div style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
             <table style={{ width: 'max-content', borderCollapse: 'separate', borderSpacing: 0 }}>
-                <thead style={{backgroundColor:'#f8f8f8'}}>
+                <thead style={{backgroundColor: themeStyles.headerBg}}>
                     <tr className="js-grid-head-row">
                         {props.columns.map((column, cdex) => {
                             const isRowNum = Boolean(column.__rownum__);
@@ -172,14 +186,17 @@ export default function JsGridTable(props: Props) {
                                         position: 'sticky',
                                         top: 0,
                                         zIndex: 4,
-                                        backgroundColor: '#f8f8f8',
-                                        borderBottom: `1px solid ${GRID_BORDER}`,
-                                        borderRight: `1px solid ${GRID_BORDER}`,
+                                        backgroundColor: themeStyles.headerBg,
+                                        ...cellBorders,
                                         boxSizing: 'border-box',
                                         cursor: isCheckbox ? 'pointer' : isRowNum ? 'default' : 'pointer',
                                         userSelect: 'none',
-                                        textAlign: 'center',
+                                        textAlign: isCheckbox || isRowNum ? 'center' : isLinear ? 'left' : 'center',
                                         paddingRight: isRowNum ? 10 : undefined,
+                                        paddingLeft:
+                                            isLinear && !isCheckbox && !isRowNum
+                                                ? LINEAR_CELL_PADDING_X
+                                                : undefined,
                                         ...(intrinsicLabelCol
                                             ? {
                                                 minWidth: 'max-content',
@@ -216,7 +233,17 @@ export default function JsGridTable(props: Props) {
                                             />
                                         </div>
                                     ) : (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',paddingLeft:6, paddingRight:6, gap:2 }}>
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: isRowNum ? 'center' : isLinear ? 'flex-start' : 'center',
+                                            paddingLeft: isLinear ? 0 : 6,
+                                            paddingRight: 6,
+                                            gap: 2,
+                                            width: isLinear && !isRowNum ? '100%' : undefined,
+                                        }}
+                                    >
                                         {!isRowNum && (
                                             <span
                                                 style={{
@@ -319,13 +346,14 @@ export default function JsGridTable(props: Props) {
                 <tbody>
                     {props.data.map((row, rdex) => {
                         const rowId = gridRowNumericId(row);
+                        const rowClass = isLinear ? "js-grid-body-row" : "border js-grid-body-row";
                         return (
                         <tr
                             key={rowId ?? `r-${rdex}`}
                             className={
                                 rowId != null
-                                    ? `border js-grid-body-row js-grid-row-idx-${rdex} js-grid-row-id-${rowId}`
-                                    : `border js-grid-body-row js-grid-row-idx-${rdex}`
+                                    ? `${rowClass} js-grid-row-idx-${rdex} js-grid-row-id-${rowId}`
+                                    : `${rowClass} js-grid-row-idx-${rdex}`
                             }
                             onClick={() => props.onRowClick?.(row)}
                             style={{ cursor: props.onRowClick ? 'pointer' : undefined }}
@@ -367,9 +395,14 @@ export default function JsGridTable(props: Props) {
                                             : column.render))
                                     : null;
 
+                                const rowStripe =
+                                    isLinear && themeStyles.bodyRowStripeBg && rdex % 2 === 0
+                                        ? { backgroundColor: themeStyles.bodyRowStripeBg }
+                                        : undefined;
+
                                 const tdStyle: CSSProperties = {
-                                    borderBottom: `1px solid ${GRID_BORDER}`,
-                                    borderRight: `1px solid ${GRID_BORDER}`,
+                                    ...rowStripe,
+                                    ...cellBorders,
                                     width: wPx != null && wPx > 0 ? `${wPx}px` : undefined,
                                     minWidth: isCheckbox ? '40px' : isRowNum ? '56px' : undefined,
                                     maxWidth:
@@ -391,8 +424,12 @@ export default function JsGridTable(props: Props) {
                                     textOverflow:
                                         intrinsicDataCol ? 'clip' : isCheckbox || isRowNum ? undefined : 'ellipsis',
                                     textAlign: isCheckbox ? 'center' : isRowNum ? 'right' : undefined,
-                                    paddingRight: isCheckbox ? undefined : 14,
-                                    paddingLeft: isCheckbox ? undefined : isRowNum ? undefined : 14,
+                                    paddingRight: isCheckbox ? undefined : LINEAR_CELL_PADDING_X,
+                                    paddingLeft: isCheckbox
+                                        ? undefined
+                                        : isRowNum
+                                          ? undefined
+                                          : LINEAR_CELL_PADDING_X,
                                     cursor: isCheckbox && props.rowSelection ? 'pointer' : undefined,
                                     ...props.getStickyStyle({ colIndex: cdex, isHeader: false }),
                                 };
@@ -409,6 +446,8 @@ export default function JsGridTable(props: Props) {
                                     }
                                 };
 
+                                const cellText = rendered ?? formatCellDisplayValue(value);
+
                                 const tdChildren = isCheckbox && props.rowSelection ? (
                                     <input
                                         type="checkbox"
@@ -416,14 +455,46 @@ export default function JsGridTable(props: Props) {
                                         readOnly
                                         style={{ pointerEvents: 'none' }}
                                     />
+                                ) : isLinear && isDataCol ? (
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: LINEAR_CELL_INNER_GAP,
+                                            minWidth: 0,
+                                            width: '100%',
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                display: 'inline-block',
+                                                flexShrink: 0,
+                                                width: SORT_ICON_PX,
+                                                minWidth: SORT_ICON_PX,
+                                                height: 1,
+                                            }}
+                                            aria-hidden
+                                        />
+                                        <span
+                                            style={{
+                                                minWidth: 0,
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                                flex: '1 1 auto',
+                                            }}
+                                        >
+                                            {cellText}
+                                        </span>
+                                    </div>
                                 ) : (
-                                    (rendered ?? formatCellDisplayValue(value))
+                                    cellText
                                 );
 
                                 return isCheckbox || isRowNum ? (
                                     <td
                                         key={colKey}
-                                        className={`border h-[30px] js-grid-row js-grid-col js-grid-col-${cdex}`}
+                                        className={`${bodyCellClass} js-grid-row js-grid-col js-grid-col-${cdex}`}
                                         onClick={onTdClick}
                                         style={tdStyle}
                                     >
@@ -432,7 +503,7 @@ export default function JsGridTable(props: Props) {
                                 ) : (
                                     <TruncatingTd
                                         key={colKey}
-                                        className={`border h-[30px] js-grid-row js-grid-col js-grid-col-${cdex}`}
+                                        className={`${bodyCellClass} js-grid-row js-grid-col js-grid-col-${cdex}`}
                                         onClick={onTdClick}
                                         style={tdStyle}
                                     >

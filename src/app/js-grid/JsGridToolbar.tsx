@@ -9,6 +9,7 @@ import {ToolbarHint} from "@bavuchoko/js-tooltip";
 import DownLoad from "../resources/icon/DownLoad.tsx";
 import Upload from "../resources/icon/Upload.tsx";
 import ColumnLock from "../resources/icon/ColumnLock.tsx";
+import {gridThemeShowsBorders, gridThemeStyles, resolveJsGridTheme, type JsGridTheme} from "./gridTheme.ts";
 
 type Props = {
     fieldsBtnRef: RefObject<HTMLDivElement | null>;
@@ -29,6 +30,7 @@ type Props = {
     trashDisabled?: boolean;
     /** `onHeaderSave`를 넘긴 경우에만 컬럼(필드) 메뉴 버튼을 표시한다. */
     showColumnFieldsMenu?: boolean;
+    theme?: JsGridTheme | string;
     style?: CSSProperties;
 };
 
@@ -47,16 +49,27 @@ export default function JsGridToolbar({
     trashBusy,
     trashDisabled,
     showColumnFieldsMenu = false,
+    theme,
     style,
 }: Props) {
+    const themeStyles = gridThemeStyles(theme);
+    const showBorders = gridThemeShowsBorders(theme);
     const showPseudoFullscreen = enablePseudoFullscreen !== false;
     const uploadSpinClass = useId().replace(/:/g, "");
     const trashSpinClass = useId().replace(/:/g, "");
 
     return (
         <div
-            className="js-grid-toolbar"
-            style={{backgroundColor:'#f8f8f8', padding: '6px 12px', borderBottom: `1px solid #bdc2c9`, userSelect: "none", cursor: "default", flexShrink: 0, ...style}}
+            className={`js-grid-toolbar js-grid-theme-${resolveJsGridTheme(theme)}`}
+            style={{
+                backgroundColor: themeStyles.toolbarBg,
+                padding: '6px 12px',
+                borderBottom: '1px solid #bdc2c9',
+                userSelect: "none",
+                cursor: "default",
+                flexShrink: 0,
+                ...style,
+            }}
         >
             <style>{`
                 @keyframes jsgrid-toolbar-spin-${uploadSpinClass} {
@@ -211,7 +224,7 @@ export default function JsGridToolbar({
                 )}
                 {showColumnFieldsMenu ? (
                     <>
-                        <div style={{borderLeft:'1px solid rgb(189, 194, 201)', height:'16px', margin:'0 2px'}} />
+                        <div style={{borderLeft: showBorders ? '1px solid rgb(189, 194, 201)' : 'none', height:'16px', margin:'0 2px'}} />
                         <div ref={fieldsBtnRef} style={{ display: 'inline-flex', alignItems: 'center' }}>
                             <ToolbarHint text="컬럼 보이기/숨기기 및 순서 변경">
                                 <div

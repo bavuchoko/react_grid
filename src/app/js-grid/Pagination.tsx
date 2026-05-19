@@ -2,6 +2,7 @@ import {useMemo, useRef, useState} from "react";
 import Prev from "../resources/icon/Prev.tsx";
 import Forward from "../resources/icon/Forward.tsx";
 import type {Page} from "../type/Type.ts";
+import {gridThemeShowsBorders, resolveJsGridTheme, type JsGridTheme} from "./gridTheme.ts";
 
 export type PaginationViewModel = {
     /** 0-based current page index */
@@ -14,9 +15,12 @@ type Props = {
     page: PaginationViewModel;
     pageableBase: Page;
     onPageChange?: (pageable: Page) => void;
+    theme?: JsGridTheme | string;
 };
 
 export default function Pagination(props: Props) {
+    const showBorders = gridThemeShowsBorders(props.theme);
+    const isLinear = resolveJsGridTheme(props.theme) === "linear";
     const totalPages = Math.max(1, props.page.totalPages || 1);
     const current0 = useMemo(() => {
         const raw = props.page.currentPage ?? 0;
@@ -66,14 +70,15 @@ export default function Pagination(props: Props) {
 
     return (
         <div
-            className="js-grid-pagination"
+            className={`js-grid-pagination js-grid-theme-${resolveJsGridTheme(props.theme)}`}
             style={{
                 height: 30,
-                borderTop: "1px solid rgb(189, 194, 201)",
-                borderBottom: "1px solid rgb(189, 194, 201)",
+                borderTop: showBorders ? "1px solid rgb(189, 194, 201)" : "none",
+                borderBottom: showBorders ? "1px solid rgb(189, 194, 201)" : "none",
                 padding: 6,
                 lineHeight: "20px",
                 boxSizing: "border-box",
+                ...(isLinear ? { backgroundColor: "#ffffff" } : {}),
             }}
         >
             <div className="js-grid-pagination-inner" style={{ display: "flex", alignItems: "center" }}>
@@ -100,7 +105,7 @@ export default function Pagination(props: Props) {
                         inputMode="numeric"
                         autoComplete="off"
                         style={{
-                            border: "1px solid rgb(189, 194, 201)",
+                            border: showBorders ? "1px solid rgb(189, 194, 201)" : "none",
                             borderRadius: 3,
                             textAlign: "right",
                             fontSize: 12,
@@ -161,7 +166,7 @@ export default function Pagination(props: Props) {
                     <p
                         style={{
                             margin: "0 5px",
-                            borderLeft: "1px solid rgb(189, 194, 201)",
+                            borderLeft: showBorders ? "1px solid rgb(189, 194, 201)" : "none",
                             height: 14,
                         }}
                     />

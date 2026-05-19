@@ -22,16 +22,20 @@ export function computeLeftOffsets(
     return offsets;
 }
 
+import {gridThemeShowsBorders} from "./gridTheme.ts";
+
 export function getColumnFreezeStickyStyle(args: {
     colIndex: number;
     isHeader: boolean;
     freezeUntilIndex: number | null;
     leftOffsets: number[];
+    theme?: string;
 }) {
-    const { colIndex, isHeader, freezeUntilIndex, leftOffsets } = args;
+    const { colIndex, isHeader, freezeUntilIndex, leftOffsets, theme } = args;
     if (freezeUntilIndex == null || colIndex > freezeUntilIndex) return undefined;
     const isLastFrozen = colIndex === freezeUntilIndex;
     const HIGHLIGHT_BG = 'rgb(219, 234, 254)';
+    const showBorders = gridThemeShowsBorders(theme);
     return {
         position: 'sticky' as const,
         left: leftOffsets[colIndex] ?? 0,
@@ -41,6 +45,8 @@ export function getColumnFreezeStickyStyle(args: {
         backgroundColor: HIGHLIGHT_BG,
         backgroundClip: 'padding-box' as const,
         // 고정 하이라이트 영역의 세로 경계선을 배경과 동일 색으로 채워 비침을 막는다.
-        borderRight: isLastFrozen ? '2px solid #1d4ed8' : `1px solid ${HIGHLIGHT_BG}`,
+        borderRight: showBorders
+            ? (isLastFrozen ? '2px solid #1d4ed8' : `1px solid ${HIGHLIGHT_BG}`)
+            : 'none',
     };
 }
