@@ -243,14 +243,18 @@ const JsGrid =(props:GridType)=> {
 
     /** 틀 고정 중에는 스크롤 시 DOM 측정이 흔들려 `left`·폭이 깨지므로, 고정 시점 너비를 스냅샷한다. */
     const [frozenLayoutWidths, setFrozenLayoutWidths] = useState<Record<string, number> | null>(null);
+    const colWidthByKeyRef = useRef(colWidthByKey);
+    colWidthByKeyRef.current = colWidthByKey;
 
     useLayoutEffect(() => {
-        if (!freezeActive) {
+        if (freezeUntilIndex == null) {
             setFrozenLayoutWidths(null);
             return;
         }
-        setFrozenLayoutWidths(captureColumnLayoutWidths(columns, headerCellRefs, colWidthByKey));
-    }, [freezeActive, freezeUntilIndex, columns, colWidthByKey, headerWidthSig]);
+        setFrozenLayoutWidths(
+            captureColumnLayoutWidths(columns, headerCellRefs, colWidthByKeyRef.current),
+        );
+    }, [freezeUntilIndex, columns, headerCellRefs]);
 
     const layoutWidths = useMemo(
         () =>
