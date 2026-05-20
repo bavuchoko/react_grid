@@ -1,4 +1,10 @@
-import {getValue, gridRowNumericId, formatCellDisplayValue, resolveChildrenCellValue} from "../hook/CommonMethod.ts";
+import {
+    getValue,
+    gridRowNumericId,
+    formatCellDisplayValue,
+    resolveChildrenCellValue,
+    shouldUseChildrenResolver,
+} from "../hook/CommonMethod.ts";
 import {
     CELL_MAX_WIDTH_PX,
     COL_RESIZE_MAX_PX,
@@ -494,7 +500,7 @@ export default function JsGridTable(props: Props) {
                                         rowIndexOnPage: rdex,
                                         fallbackPageSize: props.data.length,
                                     })
-                                    : column.type === "children"
+                                    : shouldUseChildrenResolver(column)
                                       ? resolveChildrenCellValue(row, column.key)
                                       : getValue(row, column.key);
 

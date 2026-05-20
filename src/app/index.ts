@@ -12,4 +12,8 @@ export { resolveJsGridTheme, gridThemeStyles } from "./js-grid/gridTheme.ts";
 export { default as JsGrid } from "./JsGrid.tsx";
 
 export { applyHeaderStateToHeader } from "./utils/applyHeaderState.ts";
-export { resolveChildrenCellValue } from "./hook/CommonMethod.ts";
+export {
+    resolveChildrenCellValue,
+    shouldUseChildrenResolver,
+    isChildrenStyleColumnKey,
+} from "./hook/CommonMethod.ts";

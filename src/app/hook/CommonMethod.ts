@@ -18,6 +18,39 @@ function keyStringMatchesToken(token: string, itemKey: unknown): boolean {
     return String(itemKey) === token;
 }
 
+/** `assetCustomCodes_146` · `assetCustomStrings_7` 형태 컬럼 키 */
+export function isChildrenStyleColumnKey(columnKey: string): boolean {
+    const u = columnKey.indexOf("_");
+    if (u <= 0 || u >= columnKey.length - 1) return false;
+    const suffix = columnKey.slice(u + 1).trim();
+    if (!/^\d+$/.test(suffix)) return false;
+    const prefix = columnKey.slice(0, u);
+    return prefix === "assetCustomCodes" || prefix === "assetCustomStrings";
+}
+
+/** `type === 'children'` 또는 SIMMS 스타일 컬럼 키면 배열에서 값을 찾는다. */
+export function shouldUseChildrenResolver(column: { type?: string; key: string }): boolean {
+    if (column.type === "children") return true;
+    if (column.type && column.type !== "string" && column.type !== "text") return false;
+    return isChildrenStyleColumnKey(column.key);
+}
+
+function childrenItemMatchKey(el: Record<string, unknown>): unknown {
+    if ("keyString" in el) return el.keyString;
+    const customCode = el.customCode;
+    if (customCode && typeof customCode === "object" && "id" in customCode) {
+        return (customCode as Record<string, unknown>).id;
+    }
+    if ("key" in el) return el.key;
+    return undefined;
+}
+
+function childrenItemDisplayValue(el: Record<string, unknown>): unknown {
+    if ("valueString" in el) return el.valueString;
+    if ("value" in el) return el.value;
+    return undefined;
+}
+
 /**
  * `Header.type === 'children'` 용.
  * `columnKey`는 첫 번째 `_` 앞을 `getValue` 경로(`.` 중첩 가능), 뒤를 `keyString`과 비교할 토큰으로 쓴다.
@@ -33,12 +66,10 @@ export function resolveChildrenCellValue(row: unknown, columnKey: string): unkno
     if (!Array.isArray(arr)) return undefined;
     const found = arr.find((el) => {
         if (!el || typeof el !== "object") return false;
-        const ks = (el as Record<string, unknown>).keyString;
-        return keyStringMatchesToken(keyToken, ks);
+        return keyStringMatchesToken(keyToken, childrenItemMatchKey(el as Record<string, unknown>));
     });
     if (!found || typeof found !== "object") return undefined;
-    const vs = (found as Record<string, unknown>).valueString;
-    return vs ?? undefined;
+    return childrenItemDisplayValue(found as Record<string, unknown>) ?? undefined;
 }
 
 /**
