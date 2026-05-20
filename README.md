@@ -92,12 +92,12 @@ const header: Header[] = [
 - **`onPageChange?: (pageable: Page) => void`**: 페이지/정렬 변경 시 호출 (서버 페이징 연결용)
 - **`onHeaderSave?: (headers: HeaderState[]) => void`**: 컬럼 visible 상태 저장 (현재 컬럼 설정 저장)
 - **`onHeaderReset?: () => void`**: 컬럼 설정 메뉴에서 "초기화" 클릭 시 호출
-- **`onDownloadClick?: () => void`**: 툴바 다운로드 아이콘 클릭
-- **`onUploadClick?: () => void`**: 툴바 업로드 아이콘 클릭
+- **`onDownloadClick?: () => void | Promise<void>`**: 툴바 다운로드 아이콘 클릭. `async`/`Promise` 처리 중에는 툴바 스피너와 본문(테이블·페이지네이션) 블러·「다운로드 중…」 오버레이가 표시된다.
+- **`onUploadFiles?: (files: File[]) => void | Promise<void>`**: 업로드 패널에서 전송 시 호출. 처리 중 본문 블러·「업로드 중…」 오버레이(툴바 스피너 포함).
 - **`onRowClick?: (row: unknown) => void`**: 체크박스를 제외한 행 클릭 시 호출 (클릭된 행의 데이터 객체 전달)
   - `Header.render`가 있는 셀은 기본적으로 `onRowClick`으로 이벤트가 전파되지 않습니다.
 - **`onCreateClick?: () => void`**: 툴바 추가(연필) 아이콘 클릭
-- **`onDeleteClick?: (rows: unknown[]) => void`**: 툴바 삭제(휴지통) 클릭
+- **`onDeleteClick?: (rows: unknown[]) => void | Promise<void>`**: 툴바 삭제(휴지통) 클릭. `Promise`가 끝날 때까지 로딩·그리드 블러가 유지된다.
   - 전달값은 **선택된 행 데이터 객체 배열**입니다.
   - 1개를 선택해도 **항상 배열**로 전달됩니다.
 - **`enablePseudoFullscreen?: boolean`**: 전체화면(pseudo fullscreen) 토글 기능 사용 여부 (기본값: `true`)

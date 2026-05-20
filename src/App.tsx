@@ -2133,7 +2133,10 @@ const App = () => {
         );
     }, []);
     const onHeaderReset = useCallback(() => console.log("reset clicked"), []);
-    const onDownloadClick = useCallback(() => console.log("download Clicked"), []);
+    const onDownloadClick = useCallback(async () => {
+        await new Promise((r) => setTimeout(r, 1500));
+        console.log("download Clicked");
+    }, []);
     const onCreateClick = useCallback(() => console.log("create"), []);
     // api 요청 테스트용 삭제 메서드
     const deleteApi = useCallback((ids: number[]) =>

@@ -18,6 +18,8 @@ type Props = {
     isPseudoFullscreen: boolean;
     enablePseudoFullscreen?: boolean;
     onDownLoadClick?: () => void;
+    /** `onDownLoadClick` API 처리 중일 때 다운로드 아이콘 로딩 표시 */
+    downloadBusy?: boolean;
     uploadBtnRef?: RefObject<HTMLDivElement | null>;
     /** 업로드 아이콘 클릭 — 부모에서 첨부 패널 표시 여부 등 처리 */
     onToggleUploadPanel?: (e: MouseEvent) => void;
@@ -41,6 +43,7 @@ export default function JsGridToolbar({
     isPseudoFullscreen,
     enablePseudoFullscreen,
     onDownLoadClick,
+    downloadBusy,
     uploadBtnRef,
     onToggleUploadPanel,
     uploadBusy,
@@ -56,6 +59,7 @@ export default function JsGridToolbar({
     const showBorders = gridThemeShowsBorders(theme);
     const showPseudoFullscreen = enablePseudoFullscreen !== false;
     const uploadSpinClass = useId().replace(/:/g, "");
+    const downloadSpinClass = useId().replace(/:/g, "");
     const trashSpinClass = useId().replace(/:/g, "");
 
     return (
@@ -77,6 +81,12 @@ export default function JsGridToolbar({
                 }
                 .jsgrid-toolbar-spin-dot-${uploadSpinClass} {
                     animation: jsgrid-toolbar-spin-${uploadSpinClass} 0.75s linear infinite;
+                }
+                @keyframes jsgrid-toolbar-spin-${downloadSpinClass} {
+                    to { transform: rotate(360deg); }
+                }
+                .jsgrid-toolbar-spin-dot-${downloadSpinClass} {
+                    animation: jsgrid-toolbar-spin-${downloadSpinClass} 0.75s linear infinite;
                 }
                 @keyframes jsgrid-toolbar-spin-${trashSpinClass} {
                     to { transform: rotate(360deg); }
@@ -161,11 +171,51 @@ export default function JsGridToolbar({
                             </ToolbarHint>
                         )}
                         {onDownLoadClick && (
-                            <ToolbarHint text="다운로드">
-                                <DownLoad
-                                    style={{width: '18px', cursor: 'pointer'}}
-                                    onClick={() => onDownLoadClick()}
-                                />
+                            <ToolbarHint text={downloadBusy ? "다운로드 중…" : "다운로드"}>
+                                <div
+                                    style={{
+                                        position: "relative",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        width: 18,
+                                        height: 18,
+                                        cursor: downloadBusy ? "wait" : "pointer",
+                                    }}
+                                    onClick={() => {
+                                        if (downloadBusy) return;
+                                        onDownLoadClick();
+                                    }}
+                                >
+                                    <DownLoad
+                                        style={{
+                                            width: "18px",
+                                            cursor: downloadBusy ? "wait" : "pointer",
+                                            opacity: downloadBusy ? 0.35 : 1,
+                                            flexShrink: 0,
+                                        }}
+                                        aria-busy={downloadBusy ?? false}
+                                        aria-live={downloadBusy ? "polite" : undefined}
+                                    />
+                                    {downloadBusy ? (
+                                        <span
+                                            className={`jsgrid-toolbar-spin-dot-${downloadSpinClass}`}
+                                            style={{
+                                                position: "absolute",
+                                                inset: 0,
+                                                margin: "auto",
+                                                width: 14,
+                                                height: 14,
+                                                borderRadius: "50%",
+                                                border: "2px solid #e5e7eb",
+                                                borderTopColor: "#2563eb",
+                                                boxSizing: "border-box",
+                                                pointerEvents: "none",
+                                            }}
+                                            aria-hidden
+                                        />
+                                    ) : null}
+                                </div>
                             </ToolbarHint>
                         )}
 

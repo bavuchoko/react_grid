@@ -68,8 +68,9 @@ const JsGrid =(props:GridType)=> {
     const enablePseudoFullscreen = props.enablePseudoFullscreen !== false;
     const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
     const rootRef = useRef<HTMLDivElement | null>(null);
-    const deleteSpinClass = useId().replace(/:/g, "");
+    const gridOverlaySpinClass = useId().replace(/:/g, "");
     const [deleteBusy, setDeleteBusy] = useState(false);
+    const [downloadBusy, setDownloadBusy] = useState(false);
 
     const [userColumns, setUserColumns] = useState<UserColumn[]>([]);
 
@@ -163,14 +164,14 @@ const JsGrid =(props:GridType)=> {
 
     const toggleUploadPanel = useCallback((e: { stopPropagation: () => void }) => {
         e.stopPropagation();
-        if (uploadPanelBusy) return;
+        if (uploadPanelBusy || downloadBusy) return;
         setIsFieldsMenuOpen(false);
         const rect = uploadBtnRef.current?.getBoundingClientRect();
         if (rect) {
             setUploadPanelPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
         }
         setIsUploadPanelOpen((v) => !v);
-    }, [uploadPanelBusy]);
+    }, [uploadPanelBusy, downloadBusy]);
 
     const handleUploadConfirm = useCallback(
         (files: File[]) => Promise.resolve(props.onUploadFiles?.(files)),
@@ -206,7 +207,7 @@ const JsGrid =(props:GridType)=> {
     useEffect(() => {
         if (!isUploadPanelOpen) return;
         const onDown = (e: MouseEvent) => {
-            if (uploadPanelBusy) return;
+            if (uploadPanelBusy || downloadBusy) return;
 
             const target = e.target as Node | null;
             if (!target) return;
@@ -218,7 +219,7 @@ const JsGrid =(props:GridType)=> {
         };
 
         const onKey = (e: KeyboardEvent) => {
-            if (uploadPanelBusy) return;
+            if (uploadPanelBusy || downloadBusy) return;
             if (e.key === "Escape") setIsUploadPanelOpen(false);
         };
 
@@ -230,7 +231,7 @@ const JsGrid =(props:GridType)=> {
             window.removeEventListener("keydown", onKey);
         };
 
-    }, [isUploadPanelOpen, uploadPanelBusy]);
+    }, [isUploadPanelOpen, uploadPanelBusy, downloadBusy]);
 
     const { freezeUntilIndex, setFreezeUntilIndex } = useFreezeColumns(columns.length);
     const freezeActive = freezeUntilIndex != null;
@@ -342,6 +343,17 @@ const JsGrid =(props:GridType)=> {
         setSelectedRowIndexes(new Set());
     }
 
+    const handleDownloadClick = useCallback(async () => {
+        if (downloadBusy) return;
+        if (!props.onDownloadClick) return;
+        setDownloadBusy(true);
+        try {
+            await Promise.resolve(props.onDownloadClick());
+        } finally {
+            setDownloadBusy(false);
+        }
+    }, [downloadBusy, props.onDownloadClick]);
+
     const handleDeleteSelected = useCallback(async () => {
         if (deleteBusy) return;
         if (!props.onDeleteClick) return;
@@ -373,6 +385,14 @@ const JsGrid =(props:GridType)=> {
     }, [showDelete, pageRowIds, selectedRowIndexes, headerChecked, toggleSelectAll, toggleSelectRow]);
 
     const gridTheme = resolveJsGridTheme(props.theme);
+
+    const gridBodyOverlay = useMemo(() => {
+        if (deleteBusy) return { label: "삭제 중...", accent: "#ef4444" };
+        if (downloadBusy) return { label: "다운로드 중...", accent: "#2563eb" };
+        if (uploadPanelBusy) return { label: "업로드 중...", accent: "#2563eb" };
+        return null;
+    }, [deleteBusy, downloadBusy, uploadPanelBusy]);
+    const gridBodyBusy = gridBodyOverlay != null;
 
     return (
             <div
@@ -408,11 +428,11 @@ const JsGrid =(props:GridType)=> {
                 }}
             >
                 <style>{`
-                    @keyframes jsgrid-delete-spin-${deleteSpinClass} {
+                    @keyframes jsgrid-body-overlay-spin-${gridOverlaySpinClass} {
                         to { transform: rotate(360deg); }
                     }
-                    .jsgrid-delete-spin-dot-${deleteSpinClass} {
-                        animation: jsgrid-delete-spin-${deleteSpinClass} 0.75s linear infinite;
+                    .jsgrid-body-overlay-spin-dot-${gridOverlaySpinClass} {
+                        animation: jsgrid-body-overlay-spin-${gridOverlaySpinClass} 0.75s linear infinite;
                     }
                 `}</style>
                 <JsGridToolbar
@@ -421,7 +441,8 @@ const JsGrid =(props:GridType)=> {
                     showColumnFieldsMenu={Boolean(props.onHeaderSave)}
                     isPseudoFullscreen={isPseudoFullscreen}
                     enablePseudoFullscreen={enablePseudoFullscreen}
-                    onDownLoadClick={props.onDownloadClick}
+                    onDownLoadClick={props.onDownloadClick ? handleDownloadClick : undefined}
+                    downloadBusy={props.onDownloadClick ? downloadBusy : undefined}
                     uploadBtnRef={props.onUploadFiles ? uploadBtnRef : undefined}
                     onToggleUploadPanel={props.onUploadFiles ? toggleUploadPanel : undefined}
                     uploadBusy={props.onUploadFiles ? uploadPanelBusy : undefined}
@@ -432,7 +453,7 @@ const JsGrid =(props:GridType)=> {
                     onToggleFieldsMenu={(e) => {
                         e.stopPropagation();
                         if (!props.onHeaderSave) return;
-                        if (uploadPanelBusy || fieldsSaveBusy) return;
+                        if (uploadPanelBusy || fieldsSaveBusy || downloadBusy) return;
                         setIsUploadPanelOpen(false);
                         const rect = fieldsBtnRef.current?.getBoundingClientRect();
                         if (rect) {
@@ -531,8 +552,8 @@ const JsGrid =(props:GridType)=> {
                             minHeight: 0,
                             minWidth: 0,
                             width: "100%",
-                            filter: deleteBusy ? "blur(2px)" : undefined,
-                            pointerEvents: deleteBusy ? "none" : undefined,
+                            filter: gridBodyBusy ? "blur(2px)" : undefined,
+                            pointerEvents: gridBodyBusy ? "none" : undefined,
                             transition: "filter 120ms ease",
                         }}
                     >
@@ -578,8 +599,9 @@ const JsGrid =(props:GridType)=> {
                             />
                         </div>
                     </div>
-                    {deleteBusy ? (
+                    {gridBodyOverlay ? (
                         <div
+                            className="js-grid-body-busy-overlay"
                             style={{
                                 position: "absolute",
                                 inset: 0,
@@ -590,6 +612,8 @@ const JsGrid =(props:GridType)=> {
                                 zIndex: 3,
                                 pointerEvents: "none",
                             }}
+                            aria-live="polite"
+                            aria-busy
                         >
                             <div
                                 style={{
@@ -606,18 +630,18 @@ const JsGrid =(props:GridType)=> {
                                 }}
                             >
                                 <span
-                                    className={`jsgrid-delete-spin-dot-${deleteSpinClass}`}
+                                    className={`jsgrid-body-overlay-spin-dot-${gridOverlaySpinClass}`}
                                     style={{
                                         width: 16,
                                         height: 16,
                                         borderRadius: "50%",
                                         border: "2px solid #e5e7eb",
-                                        borderTopColor: "#ef4444",
+                                        borderTopColor: gridBodyOverlay.accent,
                                         boxSizing: "border-box",
                                     }}
                                     aria-hidden
                                 />
-                                삭제 중...
+                                {gridBodyOverlay.label}
                             </div>
                         </div>
                     ) : null}
