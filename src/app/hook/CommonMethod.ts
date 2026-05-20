@@ -4,10 +4,10 @@ export const gridRowNumericId = (row: unknown): number | null => {
     return typeof v === 'number' && Number.isFinite(v) ? v : null;
 };
 
-export const getValue = (obj: any, key: string) => {
-    if (!obj || !key) return undefined;
+export const getValue = (obj: any, key: string | undefined | null) => {
+    if (!obj || key == null || key === "") return undefined;
 
-    return  key.split(".").reduce((acc, k) => acc?.[k], obj);
+    return key.split(".").reduce((acc, k) => acc?.[k], obj);
 };
 
 function keyStringMatchesToken(token: string, itemKey: unknown): boolean {
@@ -16,23 +16,6 @@ function keyStringMatchesToken(token: string, itemKey: unknown): boolean {
         return itemKey === Number(token);
     }
     return String(itemKey) === token;
-}
-
-/** `assetCustomCodes_146` · `assetCustomStrings_7` 형태 컬럼 키 */
-export function isChildrenStyleColumnKey(columnKey: string): boolean {
-    const u = columnKey.indexOf("_");
-    if (u <= 0 || u >= columnKey.length - 1) return false;
-    const suffix = columnKey.slice(u + 1).trim();
-    if (!/^\d+$/.test(suffix)) return false;
-    const prefix = columnKey.slice(0, u);
-    return prefix === "assetCustomCodes" || prefix === "assetCustomStrings";
-}
-
-/** `type === 'children'` 또는 SIMMS 스타일 컬럼 키면 배열에서 값을 찾는다. */
-export function shouldUseChildrenResolver(column: { type?: string; key: string }): boolean {
-    if (column.type === "children") return true;
-    if (column.type && column.type !== "string" && column.type !== "text") return false;
-    return isChildrenStyleColumnKey(column.key);
 }
 
 function childrenItemMatchKey(el: Record<string, unknown>): unknown {
@@ -56,8 +39,8 @@ function childrenItemDisplayValue(el: Record<string, unknown>): unknown {
  * `columnKey`는 첫 번째 `_` 앞을 `getValue` 경로(`.` 중첩 가능), 뒤를 `keyString`과 비교할 토큰으로 쓴다.
  * 예: `assetCustomStrings_7` → `row.assetCustomStrings` 배열에서 `keyString === 7`인 항목의 `valueString`.
  */
-export function resolveChildrenCellValue(row: unknown, columnKey: string): unknown {
-    if (!row || typeof row !== "object" || !columnKey) return undefined;
+export function resolveChildrenCellValue(row: unknown, columnKey: string | undefined | null): unknown {
+    if (!row || typeof row !== "object" || columnKey == null || columnKey === "") return undefined;
     const u = columnKey.indexOf("_");
     if (u <= 0 || u >= columnKey.length - 1) return undefined;
     const fieldPath = columnKey.slice(0, u);

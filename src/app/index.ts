@@ -14,6 +14,4 @@ export { default as JsGrid } from "./JsGrid.tsx";
 export { applyHeaderStateToHeader } from "./utils/applyHeaderState.ts";
 export {
     resolveChildrenCellValue,
-    shouldUseChildrenResolver,
-    isChildrenStyleColumnKey,
 } from "./hook/CommonMethod.ts";
