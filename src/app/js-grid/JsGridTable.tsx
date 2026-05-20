@@ -13,7 +13,7 @@ import {
     LINEAR_CELL_PADDING_X,
 } from "./gridStyles.ts";
 import {computeRowNumber} from "./rowNumber.ts";
-import type {CSSProperties, Dispatch, MutableRefObject, ReactNode, SetStateAction} from "react";
+import type {CSSProperties, MutableRefObject, ReactNode} from "react";
 import React, {isValidElement, useCallback, useLayoutEffect, useRef, useState} from "react";
 import type {JsGridTableColumn, Page} from "../type/Type.ts";
 import ASC from "../resources/icon/ASC.tsx";
@@ -33,26 +33,6 @@ function colWidthCss(wPx: number | null | undefined): CSSProperties {
         maxWidth: "var(--js-grid-col-width)",
         minWidth: `${COL_RESIZE_MIN_PX}px`,
     };
-}
-
-/** 틀 고정 중: colgroup·셀·sticky가 동일 px를 쓰도록 width/min/max를 잠근다. */
-function lockedColWidthCss(wPx: number): CSSProperties {
-    const px = `${wPx}px`;
-    return { width: px, minWidth: px, maxWidth: px };
-}
-
-function resolveLayoutWidthPx(
-    colKey: string,
-    freezeUntilIndex: number | null,
-    layoutWidthByKey: Record<string, number>,
-    colWidthByKey: Record<string, number>,
-): number | undefined {
-    if (freezeUntilIndex != null) {
-        const locked = layoutWidthByKey[colKey];
-        if (locked != null && locked > 0) return locked;
-    }
-    const w = colWidthByKey[colKey];
-    return w != null && w > 0 ? w : undefined;
 }
 
 function gridColClassNames(
@@ -202,10 +182,8 @@ type Props = {
     sortDir?: 'ASC' | 'DESC';
     headerCellRefs: MutableRefObject<Array<HTMLTableCellElement | null>>;
     colWidthByKey: Record<string, number>;
-    /** 스티키 `left`·고정 열 폭 계산용(틀 고정 시 스냅샷). */
-    layoutWidthByKey: Record<string, number>;
     freezeUntilIndex: number | null;
-    setFreezeUntilIndex: Dispatch<SetStateAction<number | null>>;
+    onFreezeColumn: (colIndex: number) => void;
     getStickyStyle: (args: { colIndex: number; isHeader: boolean }) => CSSProperties | undefined;
     onSortChange: (next: { key: string; direction: 'ASC' | 'DESC' }) => void;
     rowSelection?: RowSelectionProps;
@@ -223,49 +201,23 @@ export default function JsGridTable(props: Props) {
     const colCount = props.columns.length;
     const freezeActive = props.freezeUntilIndex != null;
 
-    const tableWidthPx = freezeActive
-        ? props.columns.reduce((sum, column, cdex) => {
-              const colKey = String(column.key ?? cdex);
-              return sum + (props.layoutWidthByKey[colKey] ?? 0);
-          }, 0)
-        : 0;
-
     return (
         <div className="js-grid-table-scroll">
             <table
                 className="js-grid-table"
                 style={{
-                    width: isEmpty ? '100%' : freezeActive && tableWidthPx > 0 ? `${tableWidthPx}px` : 'max-content',
+                    width: isEmpty ? '100%' : 'max-content',
                     minWidth: isEmpty ? '100%' : undefined,
                 }}
             >
-                {props.freezeUntilIndex != null ? (
-                    <colgroup>
-                        {props.columns.map((column, cdex) => {
-                            const colKey = String(column.key ?? cdex);
-                            const w = props.layoutWidthByKey[colKey];
-                            return (
-                                <col
-                                    key={colKey}
-                                    style={w != null && w > 0 ? { width: `${w}px` } : undefined}
-                                />
-                            );
-                        })}
-                    </colgroup>
-                ) : null}
                 <thead style={{backgroundColor: themeStyles.headerBg}}>
                     <tr className="js-grid-head-row">
                         {props.columns.map((column, cdex) => {
                             const isRowNum = Boolean(column.__rownum__);
                             const isCheckbox = Boolean(column.__checkbox__);
                             const colKey = String(column.key ?? cdex);
-                            const layoutW = resolveLayoutWidthPx(
-                                colKey,
-                                props.freezeUntilIndex,
-                                props.layoutWidthByKey,
-                                props.colWidthByKey,
-                            );
-                            const hasW = layoutW != null && layoutW > 0;
+                            const wPx = props.colWidthByKey[colKey];
+                            const hasW = wPx != null && wPx > 0;
                             const isDataCol = !isCheckbox && !isRowNum;
                             /** `header.width`/측정 전: CSS `max-content`로 라벨이 잘리지 않게 한 뒤 DOM에서 px 확정 */
                             const intrinsicLabelCol = isDataCol && !hasW && !freezeActive;
@@ -277,7 +229,7 @@ export default function JsGridTable(props: Props) {
                                     onClick={(e) => {
                                         if ((e.target as HTMLElement).closest("[data-jsgrid-col-resize=\"1\"]")) return;
                                         if (e.altKey) {
-                                            props.setFreezeUntilIndex((prev) => (prev === cdex ? null : cdex));
+                                            props.onFreezeColumn(cdex);
                                             return;
                                         }
                                         if (isCheckbox) {
@@ -307,9 +259,7 @@ export default function JsGridTable(props: Props) {
                                                 ? LINEAR_CELL_PADDING_X
                                                 : undefined,
                                         ...(hasW
-                                            ? freezeActive
-                                              ? lockedColWidthCss(layoutW!)
-                                              : colWidthCss(layoutW)
+                                            ? colWidthCss(wPx)
                                             : isCheckbox || isRowNum
                                               ? {
                                                   minWidth: isCheckbox ? '40px' : '56px',
@@ -481,14 +431,8 @@ export default function JsGridTable(props: Props) {
                                 const isRowNum = Boolean(column.__rownum__);
                                 const isCheckbox = Boolean(column.__checkbox__);
                                 const colKey = String(column.key ?? cdex);
-                                const layoutW = resolveLayoutWidthPx(
-                                    colKey,
-                                    props.freezeUntilIndex,
-                                    props.layoutWidthByKey,
-                                    props.colWidthByKey,
-                                );
-                                const hasW = layoutW != null && layoutW > 0;
-                                const isFrozenCol = freezeActive && cdex <= props.freezeUntilIndex!;
+                                const wPx = props.colWidthByKey[colKey];
+                                const hasW = wPx != null && wPx > 0;
                                 const value = isCheckbox
                                     ? null
                                     : column.__rownum__
@@ -527,9 +471,7 @@ export default function JsGridTable(props: Props) {
                                     ...rowStripe,
                                     ...cellBorders,
                                     ...(hasW
-                                        ? freezeActive
-                                          ? lockedColWidthCss(layoutW!)
-                                          : colWidthCss(layoutW)
+                                        ? colWidthCss(wPx)
                                         : isCheckbox || isRowNum
                                           ? { minWidth: isCheckbox ? '40px' : '56px' }
                                           : {
@@ -592,7 +534,11 @@ export default function JsGridTable(props: Props) {
                                         className={`${bodyCellBorderClass} ${gridColClassNames(cdex, column, "td")}`}
                                         onClick={onTdClick}
                                         style={tdStyle}
-                                        skipResizeObserve={isFrozenCol}
+                                        skipResizeObserve={
+                                            freezeActive &&
+                                            props.freezeUntilIndex != null &&
+                                            cdex <= props.freezeUntilIndex
+                                        }
                                     >
                                         {tdChildren}
                                     </TruncatingTd>

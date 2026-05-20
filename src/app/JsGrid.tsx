@@ -1,5 +1,5 @@
 import type {GridType, Header, HeaderState, JsGridTableColumn, Page} from "./type/Type.ts";
-import {useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from "react";
+import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react";
 import ColumnFieldsMenu from "./js-grid/ColumnFieldsMenu.tsx";
 import {toHeaderState, type UserColumn} from "./js-grid/columnFieldsMenuModel.ts";
 import {
@@ -242,20 +242,21 @@ const JsGrid =(props:GridType)=> {
         freezeActive,
     );
 
-    /** 틀 고정 중에는 스크롤 시 DOM 측정이 흔들려 `left`·폭이 깨지므로, 고정 시점 너비를 스냅샷한다. */
+    /** 틀 고정 `sticky left` 합산용. 셀 width CSS는 건드리지 않고 클릭 직전 DOM만 스냅샷한다. */
     const [frozenLayoutWidths, setFrozenLayoutWidths] = useState<Record<string, number> | null>(null);
-    const colWidthByKeyRef = useRef(colWidthByKey);
-    colWidthByKeyRef.current = colWidthByKey;
 
-    useLayoutEffect(() => {
-        if (freezeUntilIndex == null) {
-            setFrozenLayoutWidths(null);
-            return;
-        }
-        setFrozenLayoutWidths(
-            captureColumnLayoutWidths(columns, headerCellRefs, colWidthByKeyRef.current),
-        );
-    }, [freezeUntilIndex, columns, headerCellRefs]);
+    const handleFreezeColumn = useCallback(
+        (colIndex: number) => {
+            if (freezeUntilIndex === colIndex) {
+                setFreezeUntilIndex(null);
+                setFrozenLayoutWidths(null);
+                return;
+            }
+            setFrozenLayoutWidths(captureColumnLayoutWidths(columns, headerCellRefs));
+            setFreezeUntilIndex(colIndex);
+        },
+        [freezeUntilIndex, columns, headerCellRefs, setFreezeUntilIndex],
+    );
 
     const layoutWidths = useMemo(
         () =>
@@ -271,18 +272,14 @@ const JsGrid =(props:GridType)=> {
     );
 
     const getStickyStyle = useCallback((args: { colIndex: number; isHeader: boolean }) => {
-        const col = columns[args.colIndex];
-        const colKey = String(col?.key ?? args.colIndex);
-        const frozenWidthPx = freezeActive ? layoutWidths[colKey] : undefined;
         return getColumnFreezeStickyStyle({
             colIndex: args.colIndex,
             isHeader: args.isHeader,
             freezeUntilIndex,
             leftOffsets,
             theme: props.theme,
-            frozenWidthPx,
         });
-    }, [freezeActive, freezeUntilIndex, leftOffsets, layoutWidths, columns, props.theme]);
+    }, [freezeUntilIndex, leftOffsets, props.theme]);
 
     const totalPages = page.totalPages ?? 1;
     const currentPage0 = page.pageNumber ?? 0;
@@ -566,10 +563,9 @@ const JsGrid =(props:GridType)=> {
                             sortDir={sortDir}
                             headerCellRefs={headerCellRefs}
                             colWidthByKey={colWidthByKey}
-                            layoutWidthByKey={layoutWidths}
                             freezeUntilIndex={freezeUntilIndex}
                             onColumnWidthChange={props.resizable ? setColumnWidth : undefined}
-                            setFreezeUntilIndex={setFreezeUntilIndex}
+                            onFreezeColumn={handleFreezeColumn}
                             getStickyStyle={getStickyStyle}
                             rowSelection={rowSelection}
                             onRowClick={props.onRowClick}

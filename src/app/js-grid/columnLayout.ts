@@ -15,9 +15,13 @@ export function readHeaderCellWidths(
     columns.forEach((col, idx) => {
         const key = String(col.key ?? idx);
         const el = headerCellRefs.current[idx];
-        // offsetWidth: 스크롤·sticky 합성 시 getBoundingClientRect()보다 흔들림이 적다.
-        const measured = el?.offsetWidth ?? 0;
-        if (measured > 0) next[key] = Math.round(measured);
+        if (!el) return;
+        // border-box 전체 폭(패딩·테두리 포함). rect·offsetWidth 중 큰 값을 쓴다.
+        const measured = Math.max(
+            el.offsetWidth,
+            Math.ceil(el.getBoundingClientRect().width),
+        );
+        if (measured > 0) next[key] = measured;
     });
     return next;
 }
@@ -36,16 +40,15 @@ export function mergeMeasuredWithOverride(
     return next;
 }
 
+/**
+ * 틀 고정 직전 헤더 셀의 실제 렌더 너비(border-box, 패딩·테두리 포함).
+ * `header.width`/override만 쓰면 패딩만큼 좁게 잠기는 경우가 있다.
+ */
 export function captureColumnLayoutWidths(
     columns: readonly JsGridTableColumn[],
     headerCellRefs: MutableRefObject<Array<HTMLTableCellElement | null>>,
-    overrideByKey: Record<string, number>,
 ): Record<string, number> {
-    return mergeMeasuredWithOverride(
-        readHeaderCellWidths(columns, headerCellRefs),
-        overrideByKey,
-        columns,
-    );
+    return readHeaderCellWidths(columns, headerCellRefs);
 }
 
 function defaultColumnMinPx(col: JsGridTableColumn): number {
@@ -92,7 +95,7 @@ export function computeLeftOffsets(columns: readonly JsGridTableColumn[], widthB
     return offsets;
 }
 
-/** 고정 열: 스크롤 중에도 px 폭이 흔들리지 않도록 width/min/max를 동일하게 고정한다. */
+/** 고정 열 셀: border-box 기준으로 width/min/max를 동일 px로 잠근다. */
 export function frozenColumnWidthCss(wPx: number): Pick<CSSProperties, "width" | "minWidth" | "maxWidth"> {
     const px = `${wPx}px`;
     return { width: px, minWidth: px, maxWidth: px };
@@ -104,10 +107,8 @@ export function getColumnFreezeStickyStyle(args: {
     freezeUntilIndex: number | null;
     leftOffsets: number[];
     theme?: string;
-    /** 틀 고정 스냅샷 너비(px). 있으면 셀 폭을 고정한다. */
-    frozenWidthPx?: number;
 }) {
-    const { colIndex, isHeader, freezeUntilIndex, leftOffsets, theme, frozenWidthPx } = args;
+    const { colIndex, isHeader, freezeUntilIndex, leftOffsets, theme } = args;
     if (freezeUntilIndex == null || colIndex > freezeUntilIndex) return undefined;
     const isLastFrozen = colIndex === freezeUntilIndex;
     const showBorders = gridThemeShowsBorders(theme);
@@ -124,6 +125,5 @@ export function getColumnFreezeStickyStyle(args: {
               ? `1px solid ${FREEZE_HIGHLIGHT_BG}`
               : "none",
         ...(isLastFrozen ? { boxShadow: "inset -2px 0 0 #1d4ed8" } : {}),
-        ...(frozenWidthPx != null && frozenWidthPx > 0 ? frozenColumnWidthCss(frozenWidthPx) : {}),
     };
 }
