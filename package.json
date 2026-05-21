@@ -1,6 +1,6 @@
 {
   "name": "@bavuchoko/js-grid",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "React data grid (JsGrid) with toolbar, column layout, and pagination",
   "type": "module",
   "main": "./dist/index.js",
