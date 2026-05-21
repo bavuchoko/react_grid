@@ -1,7 +1,7 @@
 <img width="701" height="462" alt="스크린샷 2026-04-28 오후 9 08 45" src="https://github.com/user-attachments/assets/169a8fd6-4fe6-4ce5-9865-d9b6476d5cfe" />
 # js-grid
 
-React/TypeScript 기반의 그리드 컴포넌트(`JsGrid`)입니다. 컬럼 표시/숨김, 순서 변경, 고정(Alt+클릭), 정렬, 페이지네이션, 선택 삭제, 내장 툴바(삭제·컬럼 설정 등), 커스텀 툴바(`ToolbarAsyncAction`·`ToolbarUploadAction`) 등을 제공합니다.
+React/TypeScript 기반의 그리드 컴포넌트(`JsGrid`)입니다. 컬럼 표시/숨김, 순서 변경, 고정(Alt+클릭), 정렬, 페이지네이션, 행 선택, 내장 툴바(컬럼 설정·전체화면 등), 커스텀 툴바(`ToolbarAsyncAction`·`ToolbarDataTransfer`·`ToolbarUploadAction`) 등을 제공합니다.
 
 
 ## 개발 실행
@@ -94,9 +94,7 @@ const header: Header[] = [
 - **`onHeaderReset?: () => void | Promise<void>`**: 컬럼 설정 메뉴에서 "초기화" 클릭 시 호출. `async`/`Promise` 처리 중에는 저장과 동일하게 툴바·본문 로딩이 표시된다.
 - **`onRowClick?: (row: unknown) => void`**: 체크박스를 제외한 행 클릭 시 호출 (클릭된 행의 데이터 객체 전달)
   - `Header.render`가 있는 셀은 기본적으로 `onRowClick`으로 이벤트가 전파되지 않습니다.
-- **`onDeleteClick?: (rows: unknown[]) => void | Promise<void>`**: 툴바 삭제(휴지통) 클릭. `Promise`가 끝날 때까지 로딩·그리드 블러가 유지된다.
-  - 전달값은 **선택된 행 데이터 객체 배열**입니다.
-  - 1개를 선택해도 **항상 배열**로 전달됩니다.
+- **`enableRowSelection?: boolean`**: `true`면 체크박스 열·행 선택 UI를 표시한다. 삭제·보내기 등은 `toolbarEnd`의 **`ToolbarDataTransfer`**로 처리한다(선택과 콜백을 분리).
 - **`enablePseudoFullscreen?: boolean`**: 전체화면(pseudo fullscreen) 토글 기능 사용 여부 (기본값: `true`)
 
 ### 스타일
@@ -118,7 +116,7 @@ const header: Header[] = [
 
 ### 툴바 커스텀 아이콘 / UI
 
-그리드 **기본 툴바**는 삭제(선택 시)·컬럼 설정·전체화면 등입니다. **다운로드·업로드·필터·행 추가** 등은 `toolbarStart` / `toolbarEnd`에 커스텀 컴포넌트로 넣습니다.
+그리드 **기본 툴바**는 컬럼 설정·전체화면 등입니다. **삭제·다운로드·업로드·필터** 등은 `toolbarStart` / `toolbarEnd`에 커스텀 컴포넌트로 넣습니다.
 
 | Prop | 타입 | 위치 |
 |------|------|------|
@@ -126,6 +124,52 @@ const header: Header[] = [
 | **`toolbarEnd`** | `ReactNode` \| `(api) => ReactNode` | 툴바 **오른쪽** — 기본 액션 아이콘들 **앞** |
 
 아이콘 크기는 기본 툴바와 맞추려면 **약 18×18px**을 권장합니다.
+
+#### `ToolbarDataTransfer` — 선택 행 전달(삭제 등)
+
+`enableRowSelection`과 함께 사용한다. 클릭 시 **선택된 행 데이터 배열**로 `onTransfer`가 호출되고, 성공 시 선택이 해제된다.
+
+```tsx
+import JsGrid, { ToolbarDataTransfer } from "@bavuchoko/js-grid";
+import Trash from "./TrashIcon";
+
+<JsGrid
+  enableRowSelection
+  toolbarEnd={() => (
+    <ToolbarDataTransfer
+      hint="선택 항목 삭제"
+      busyHint="삭제 중…"
+      overlayLabel="삭제 중…"
+      onTransfer={async (rows) => {
+        await deleteApi(rows);
+      }}
+    >
+      <Trash />
+    </ToolbarDataTransfer>
+  )}
+/>
+```
+
+확인창·추가 검증은 `children`을 함수로 넘겨 `transferSelected()` 전에 처리할 수 있다.
+
+| Prop | 적용 시점 |
+|------|-----------|
+| `className` | 기본 아이콘 래퍼에 항상 |
+| `disabledClassName` | 선택 없음 등 클릭 불가(`not-allowed`)일 때 |
+| `busyClassName` | `onTransfer` 처리 중(`wait`)일 때 |
+
+```tsx
+<ToolbarDataTransfer
+  className="my-grid-delete"
+  disabledClassName="my-grid-delete--disabled"
+  busyClassName="my-grid-delete--busy"
+  onTransfer={onDelete}
+>
+  <Trash />
+</ToolbarDataTransfer>
+```
+
+`children`을 함수로 쓰면 클래스는 직접 `ctx.disabled` / `ctx.busy`에 맞춰 붙이면 된다.
 
 #### `ToolbarAsyncAction`으로 감싸서 넣기 (권장)
 
@@ -232,8 +276,8 @@ import JsGrid, { ToolbarUploadAction, DEFAULT_EXCEL_UPLOAD_ACCEPT } from "@bavuc
 />
 ```
 
-- **내장**: `onDeleteClick`, `onHeaderSave` …
-- **커스텀**: `ToolbarUploadAction`, `ToolbarAsyncAction` …
+- **내장**: `enableRowSelection`, `onHeaderSave` …
+- **커스텀**: `ToolbarDataTransfer`, `ToolbarUploadAction`, `ToolbarAsyncAction` …
 - 왼쪽·오른쪽에 나눠 넣으려면 `toolbarStart` / `toolbarEnd`를 각각 사용합니다.
 - 동시에 여러 API를 돌리지 않도록, 필요하면 앱에서 클릭 가드·`disabled`를 추가하세요.
 
@@ -278,7 +322,7 @@ import type { JsGridToolbarApi } from "@bavuchoko/js-grid";
 />
 ```
 
-패키지 export: `JsGrid`, `ToolbarAsyncAction`, `ToolbarUploadAction`, `DEFAULT_EXCEL_UPLOAD_ACCEPT`, `useJsGridToolbar`, `JsGridToolbarApi`, `JsGridToolbarSlot`
+패키지 export: `JsGrid`, `ToolbarAsyncAction`, `ToolbarDataTransfer`, `ToolbarUploadAction`, `DEFAULT_EXCEL_UPLOAD_ACCEPT`, `useJsGridToolbar`, `useJsGridRowSelection`, `JsGridToolbarApi`, `JsGridRowSelectionApi`, `JsGridToolbarSlot`
 
 ## UI 기능
 
@@ -293,7 +337,7 @@ import type { JsGridToolbarApi } from "@bavuchoko/js-grid";
     - 저장한 너비를 다시 적용하려면, 다음 렌더에서 해당 컬럼의 `header.width`(px)에 주입해 주세요.
 - **pseudo fullscreen**: 툴바의 전체화면 아이콘으로 토글 (ESC로 종료)
   - `enablePseudoFullscreen={false}`면 전체화면 버튼/동작이 비활성화됩니다.
-- **선택/삭제**: `onDeleteClick`을 전달하면 체크박스 컬럼과 휴지통이 나타납니다.
+- **행 선택**: `enableRowSelection`이면 체크박스 컬럼이 나타납니다. 삭제 버튼은 `ToolbarDataTransfer`를 `toolbarEnd`에 넣습니다.
 
 ## 서버 페이징 연결 예시
 

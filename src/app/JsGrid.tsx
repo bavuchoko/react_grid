@@ -1,6 +1,17 @@
-import type {GridType, Header, HeaderState, JsGridTableColumn, JsGridToolbarSlot, Page} from "./type/Type.ts";
+import type {
+    GridType,
+    Header,
+    HeaderState,
+    JsGridTableColumn,
+    JsGridToolbarSlot,
+    Page,
+} from "./type/Type.ts";
 import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react";
 import { JsGridToolbarProvider } from "./js-grid/JsGridToolbarContext.tsx";
+import {
+    JsGridRowSelectionProvider,
+    type JsGridRowSelectionApi,
+} from "./js-grid/JsGridRowSelectionContext.tsx";
 import ColumnFieldsMenu from "./js-grid/ColumnFieldsMenu.tsx";
 import {toHeaderState, type UserColumn} from "./js-grid/columnFieldsMenuModel.ts";
 import {
@@ -68,7 +79,6 @@ const JsGrid =(props:GridType)=> {
     const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
     const rootRef = useRef<HTMLDivElement | null>(null);
     const gridOverlaySpinClass = useId().replace(/:/g, "");
-    const [deleteBusy, setDeleteBusy] = useState(false);
     const [userColumns, setUserColumns] = useState<UserColumn[]>([]);
 
     const keysSig = useMemo(
@@ -112,7 +122,7 @@ const JsGrid =(props:GridType)=> {
         };
     }, [enablePseudoFullscreen, isPseudoFullscreen]);
 
-    const showDelete = Boolean(props.onDeleteClick);
+    const showRowSelection = props.enableRowSelection === true;
 
     const headerWidthSig = useMemo(
         () => headerList.map((h) => `${h.key}:${h.width ?? ""}`).join("\u0001"),
@@ -137,8 +147,8 @@ const JsGrid =(props:GridType)=> {
             });
         const rowNum = { key: "__rownum__", label: "#", __rownum__: true as const };
         const cb = { key: "__checkbox__", label: "", __checkbox__: true as const };
-        return showDelete ? [cb, rowNum, ...visible] : [rowNum, ...visible];
-    }, [userColumns, showDelete, header]);
+        return showRowSelection ? [cb, rowNum, ...visible] : [rowNum, ...visible];
+    }, [userColumns, showRowSelection, header]);
 
     const [isFieldsMenuOpen, setIsFieldsMenuOpen] = useState(false);
     const [fieldsSaveBusy, setFieldsSaveBusy] = useState(false);
@@ -250,7 +260,7 @@ const JsGrid =(props:GridType)=> {
     const [selectedRowIndexes, setSelectedRowIndexes] = useState<Set<number>>(() => new Set());
     const [selectionAnchor, setSelectionAnchor] = useState(() => ({
         page: page.pageNumber ?? 0,
-        show: Boolean(props.onDeleteClick),
+        show: showRowSelection,
     }));
 
     const pageRowIds = useMemo(() => {
@@ -283,32 +293,36 @@ const JsGrid =(props:GridType)=> {
         });
     }, []);
 
-    if (selectionAnchor.page !== currentPage0 || selectionAnchor.show !== showDelete) {
-        setSelectionAnchor({ page: currentPage0, show: showDelete });
+    if (selectionAnchor.page !== currentPage0 || selectionAnchor.show !== showRowSelection) {
+        setSelectionAnchor({ page: currentPage0, show: showRowSelection });
         setSelectedRowIndexes(new Set());
     }
 
-    const handleDeleteSelected = useCallback(async () => {
-        if (deleteBusy) return;
-        if (!props.onDeleteClick) return;
-        const selectedRows = Array
-            .from(selectedRowIndexes)
-            .sort((a, b) => a - b)
-            .map((i) => data[i])
-            .filter((v) => v !== undefined);
-        if (selectedRows.length === 0) return;
+    const selectedRows = useMemo(
+        () =>
+            Array.from(selectedRowIndexes)
+                .sort((a, b) => a - b)
+                .map((i) => data[i])
+                .filter((v) => v !== undefined),
+        [selectedRowIndexes, data],
+    );
 
-        setDeleteBusy(true);
-        try {
-            await Promise.resolve(props.onDeleteClick(selectedRows));
-            setSelectedRowIndexes(new Set());
-        } finally {
-            setDeleteBusy(false);
-        }
-    }, [deleteBusy, props.onDeleteClick, selectedRowIndexes, data]);
+    const clearSelection = useCallback(() => {
+        setSelectedRowIndexes(new Set());
+    }, []);
+
+    const rowSelectionApi = useMemo((): JsGridRowSelectionApi | null => {
+        if (!showRowSelection) return null;
+        return {
+            selectedCount: selectedRows.length,
+            selectedRows,
+            disabled: selectedRows.length === 0,
+            clearSelection,
+        };
+    }, [showRowSelection, selectedRows, clearSelection]);
 
     const rowSelection = useMemo(() => {
-        if (!showDelete) return undefined;
+        if (!showRowSelection) return undefined;
         return {
             pageRowIds,
             selectedIds: selectedRowIndexes,
@@ -316,7 +330,7 @@ const JsGrid =(props:GridType)=> {
             onToggleAll: toggleSelectAll,
             onToggleRow: toggleSelectRow,
         };
-    }, [showDelete, pageRowIds, selectedRowIndexes, headerChecked, toggleSelectAll, toggleSelectRow]);
+    }, [showRowSelection, pageRowIds, selectedRowIndexes, headerChecked, toggleSelectAll, toggleSelectRow]);
 
     const gridTheme = resolveJsGridTheme(props.theme);
 
@@ -376,15 +390,15 @@ const JsGrid =(props:GridType)=> {
 
     const gridBodyOverlay = useMemo(() => {
         if (toolbarOverlay) return toolbarOverlay;
-        if (deleteBusy) return { label: "삭제 중...", accent: "#ef4444" };
         if (fieldsSaveBusy) return { label: "저장 중...", accent: "#2563eb" };
         if (fieldsResetBusy) return { label: "초기화 중...", accent: "#2563eb" };
         return null;
-    }, [toolbarOverlay, deleteBusy, fieldsSaveBusy, fieldsResetBusy]);
+    }, [toolbarOverlay, fieldsSaveBusy, fieldsResetBusy]);
     const gridBodyBusy = gridBodyOverlay != null;
 
     return (
         <JsGridToolbarProvider value={toolbarApi}>
+            <JsGridRowSelectionProvider value={rowSelectionApi}>
             <div
                 className={`js-grid-container js-grid-theme-${gridTheme}`}
                 ref={rootRef}
@@ -431,9 +445,6 @@ const JsGrid =(props:GridType)=> {
                     showColumnFieldsMenu={Boolean(props.onHeaderSave)}
                     isPseudoFullscreen={isPseudoFullscreen}
                     enablePseudoFullscreen={enablePseudoFullscreen}
-                    onTrashClick={props.onDeleteClick ? handleDeleteSelected : undefined}
-                    trashBusy={deleteBusy}
-                    trashDisabled={selectedRowIndexes.size === 0 || deleteBusy}
                     fieldsBusy={props.onHeaderSave ? fieldsActionBusy : undefined}
                     fieldsBusyLabel={fieldsBusyLabel}
                     onToggleFieldsMenu={(e) => {
@@ -633,6 +644,7 @@ const JsGrid =(props:GridType)=> {
                     ) : null}
                 </div>
             </div>
+            </JsGridRowSelectionProvider>
         </JsGridToolbarProvider>
     );
 }

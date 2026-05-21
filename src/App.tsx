@@ -1,7 +1,9 @@
 import type {Header, HeaderState} from "./app/type/Type.ts";
 import JsGrid from "./app/JsGrid.tsx";
 import ToolbarAsyncAction from "./app/js-grid/ToolbarAsyncAction.tsx";
+import ToolbarDataTransfer from "./app/js-grid/ToolbarDataTransfer.tsx";
 import DownLoad from "./app/resources/icon/DownLoad.tsx";
+import Trash from "./app/resources/icon/Trash.tsx";
 import {useCallback, useMemo, useState} from "react";
 import {applyHeaderStateToHeader} from "./app/index.ts";
 
@@ -2189,7 +2191,8 @@ const App = () => {
             window.setTimeout(() => resolve(), 1000);
         }), []);
 
-    const onDeleteClick = useCallback(async (rows: unknown[]) => {
+    const onDeleteTransfer = useCallback(async (rows: unknown[]) => {
+        console.log(rows)
         const ids = rows
             .map((r) => (r as { id?: unknown }).id)
             .filter((id): id is number => typeof id === "number" && Number.isFinite(id));
@@ -2258,6 +2261,15 @@ const App = () => {
                     <div style={demoToolbarCustomGap}>
                         {isAdmin ? (
                             <>
+                                <ToolbarDataTransfer
+                                    hint="선택 항목 삭제"
+                                    disabledClassName={`testetsetset`}
+                                    busyHint="삭제 중…"
+                                    overlayLabel="삭제 중…"
+                                    onTransfer={onDeleteTransfer}
+                                >
+                                    <Trash style={{ width: 18, flexShrink: 0 }} />
+                                </ToolbarDataTransfer>
                                 <ToolbarAsyncAction
                                     hint="다운로드 (테스트)"
                                     busyHint="다운로드 중…"
@@ -2296,7 +2308,7 @@ const App = () => {
                 data={pageData}
                 onHeaderSave={isAdmin ? onHeaderSave : undefined}
                 onHeaderReset={onHeaderReset}
-                onDeleteClick={isAdmin ? onDeleteClick : undefined}
+                enableRowSelection={isAdmin}
                 onRowClick={onRowClick}
                 onPageChange={onPageChange}
             />

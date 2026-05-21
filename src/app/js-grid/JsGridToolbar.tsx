@@ -3,7 +3,6 @@ import type {CSSProperties, MouseEvent, ReactNode, RefObject} from "react";
 import Fields from "../resources/icon/Fields.tsx";
 import Expand from "../resources/icon/Expand.tsx";
 import Shrink from "../resources/icon/Shrink.tsx";
-import Trash from "../resources/icon/Trash.tsx";
 import {ToolbarHint} from "@bavuchoko/js-tooltip";
 import ColumnLock from "../resources/icon/ColumnLock.tsx";
 import {gridThemeStyles, resolveJsGridTheme, type JsGridTheme} from "./gridTheme.ts";
@@ -14,10 +13,6 @@ type Props = {
     onTogglePseudoFullscreen: () => void;
     isPseudoFullscreen: boolean;
     enablePseudoFullscreen?: boolean;
-    /** 선택된 행 삭제(콜백은 부모에서 `onDelete`와 연결) */
-    onTrashClick?: () => void;
-    trashBusy?: boolean;
-    trashDisabled?: boolean;
     /** `onHeaderSave`를 넘긴 경우에만 컬럼(필드) 메뉴 버튼을 표시한다. */
     showColumnFieldsMenu?: boolean;
     /** 컬럼 저장·초기화 API 처리 중일 때 필드 아이콘 로딩 표시 */
@@ -35,9 +30,6 @@ export default function JsGridToolbar({
     onTogglePseudoFullscreen,
     isPseudoFullscreen,
     enablePseudoFullscreen,
-    onTrashClick,
-    trashBusy,
-    trashDisabled,
     showColumnFieldsMenu = false,
     fieldsBusy,
     fieldsBusyLabel,
@@ -49,7 +41,6 @@ export default function JsGridToolbar({
     const themeStyles = gridThemeStyles(theme);
     const showPseudoFullscreen = enablePseudoFullscreen !== false;
     const fieldsSpinClass = useId().replace(/:/g, "");
-    const trashSpinClass = useId().replace(/:/g, "");
 
     return (
         <div
@@ -71,12 +62,6 @@ export default function JsGridToolbar({
                 .jsgrid-toolbar-spin-dot-${fieldsSpinClass} {
                     animation: jsgrid-toolbar-spin-${fieldsSpinClass} 0.75s linear infinite;
                 }
-                @keyframes jsgrid-toolbar-spin-${trashSpinClass} {
-                    to { transform: rotate(360deg); }
-                }
-                .jsgrid-toolbar-spin-dot-${trashSpinClass} {
-                    animation: jsgrid-toolbar-spin-${trashSpinClass} 0.75s linear infinite;
-                }
             `}</style>
             <div className="js-grid-toolbar-inner" style={{display: 'flex', alignItems:'center', justifyContent:'space-between'}}>
                 <div className="js-grid-toolbar-start" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -92,63 +77,12 @@ export default function JsGridToolbar({
 
                 <div className="js-grid-toolbar-actions" style={{display: 'flex', alignItems:'center', gap:'16px', justifyContent:'end'}}>
 
-
-
                     {toolbarEnd ? (
                         <div className="js-grid-toolbar-custom js-grid-toolbar-custom-end">
                             {toolbarEnd}
                         </div>
                     ) : null}
 
-                {onTrashClick && (
-                    <>
-                        <ToolbarHint text={trashBusy ? "삭제 중…" : (trashDisabled ? "삭제할 행을 선택하세요" : "선택 항목 삭제")}>
-                            <div
-                                style={{
-                                    position: "relative",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    width: 18,
-                                    height: 18,
-                                    cursor: (trashDisabled || trashBusy) ? "wait" : "pointer",
-                                }}
-                            >
-                                <Trash
-                                    style={{
-                                        width: '18px',
-                                        cursor: (trashDisabled || trashBusy) ? 'not-allowed' : 'pointer',
-                                        opacity: (trashDisabled || trashBusy) ? 0.45 : 1,
-                                        flexShrink: 0,
-                                    }}
-                                    onClick={() => {
-                                        if (trashDisabled || trashBusy) return;
-                                        onTrashClick();
-                                    }}
-                                />
-                                {trashBusy ? (
-                                    <span
-                                        className={`jsgrid-toolbar-spin-dot-${trashSpinClass}`}
-                                        style={{
-                                            position: "absolute",
-                                            inset: 0,
-                                            margin: "auto",
-                                            width: 14,
-                                            height: 14,
-                                            borderRadius: "50%",
-                                            border: "2px solid #e5e7eb",
-                                            borderTopColor: "#ef4444",
-                                            boxSizing: "border-box",
-                                            pointerEvents: "none",
-                                        }}
-                                        aria-hidden
-                                    />
-                                ) : null}
-                            </div>
-                        </ToolbarHint>
-
-                    </>
-                )}
                 {showColumnFieldsMenu ? (
                     <>
                         <div
