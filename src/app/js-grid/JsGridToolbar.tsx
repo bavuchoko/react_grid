@@ -1,5 +1,5 @@
 import {useId} from "react";
-import type {CSSProperties, MouseEvent, RefObject} from "react";
+import type {CSSProperties, MouseEvent, ReactNode, RefObject} from "react";
 import Fields from "../resources/icon/Fields.tsx";
 import Expand from "../resources/icon/Expand.tsx";
 import Shrink from "../resources/icon/Shrink.tsx";
@@ -32,6 +32,8 @@ type Props = {
     trashDisabled?: boolean;
     /** `onHeaderSave`를 넘긴 경우에만 컬럼(필드) 메뉴 버튼을 표시한다. */
     showColumnFieldsMenu?: boolean;
+    toolbarStart?: ReactNode;
+    toolbarEnd?: ReactNode;
     theme?: JsGridTheme | string;
     style?: CSSProperties;
 };
@@ -52,6 +54,8 @@ export default function JsGridToolbar({
     trashBusy,
     trashDisabled,
     showColumnFieldsMenu = false,
+    toolbarStart,
+    toolbarEnd,
     theme,
     style,
 }: Props) {
@@ -99,6 +103,11 @@ export default function JsGridToolbar({
                     <ToolbarHint text="헤더 고정 : alt + 헤더 클릭">
                         <ColumnLock style={{ width: '18px', cursor: 'default', opacity: 0.75 }} />
                     </ToolbarHint>
+                    {toolbarStart ? (
+                        <div className="js-grid-toolbar-custom js-grid-toolbar-custom-start">
+                            {toolbarStart}
+                        </div>
+                    ) : null}
                 </div>
 
                 <div className="js-grid-toolbar-actions" style={{display: 'flex', alignItems:'center', gap:'16px', justifyContent:'end'}}>
@@ -295,6 +304,12 @@ export default function JsGridToolbar({
                             </ToolbarHint>
                         </div>
                     </>
+                ) : null}
+
+                {toolbarEnd ? (
+                    <div className="js-grid-toolbar-custom js-grid-toolbar-custom-end">
+                        {toolbarEnd}
+                    </div>
                 ) : null}
 
                 {showPseudoFullscreen && (

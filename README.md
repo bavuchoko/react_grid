@@ -104,6 +104,8 @@ const header: Header[] = [
 
 ### 스타일
 
+- **`toolbarStart?: React.ReactNode`**: 툴바 왼쪽(헤더 고정 안내 옆) 커스텀 UI
+- **`toolbarEnd?: React.ReactNode`**: 툴바 오른쪽(기본 아이콘·컬럼 메뉴 뒤, 전체화면 앞) 커스텀 UI
 - **`style?: React.CSSProperties`**: `JsGrid` 루트 컨테이너 스타일 오버라이드
   - 기본 스타일은 유지되고, `style`을 넘기면 해당 값이 덮어써집니다.
   - pseudo fullscreen(전체화면)일 때는 레이아웃을 위해 일부 값(`width/height/position/zIndex/boxShadow` 등)이 강제로 적용됩니다.

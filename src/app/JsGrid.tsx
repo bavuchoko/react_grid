@@ -462,6 +462,8 @@ const JsGrid =(props:GridType)=> {
                         setIsFieldsMenuOpen(v => !v);
                     }}
                     onTogglePseudoFullscreen={() => setIsPseudoFullscreen(v => !v)}
+                    toolbarStart={props.toolbarStart}
+                    toolbarEnd={props.toolbarEnd}
                 />
 
                 {props.onUploadFiles ? (

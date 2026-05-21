@@ -34,6 +34,10 @@ export type GridType ={
     theme?: JsGridTheme
     /** `true`일 때만 헤더에서 열 너비 드래그·리사이즈 핸들(`|`)이 표시·동작한다. */
     resizable?: boolean
+    /** 툴바 왼쪽(헤더 고정 안내 옆)에 렌더할 커스텀 UI. */
+    toolbarStart?: ReactNode
+    /** 툴바 오른쪽 기본 아이콘 뒤·전체화면 버튼 앞에 렌더할 커스텀 UI. */
+    toolbarEnd?: ReactNode
     style?: CSSProperties
 }
 

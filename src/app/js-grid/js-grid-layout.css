@@ -50,6 +50,13 @@
     background-color: transparent;
 }
 
+.js-grid-toolbar-custom {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
 .js-grid-theme-linear .js-grid-col-resize-grip {
     color: #9ca3af;
     font-size: 13px;
