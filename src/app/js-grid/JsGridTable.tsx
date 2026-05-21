@@ -415,16 +415,25 @@ export default function JsGridTable(props: Props) {
                     {!isEmpty && props.data.map((row, rdex) => {
                         const rowId = gridRowNumericId(row);
                         const rowClass = isLinear ? "js-grid-body-row" : "border js-grid-body-row";
+                        const rowStripeClass =
+                            isLinear && themeStyles.bodyRowStripeBg && rdex % 2 === 0
+                                ? " js-grid-row-stripe"
+                                : "";
                         return (
                         <tr
                             key={rowId ?? `r-${rdex}`}
                             className={
                                 rowId != null
-                                    ? `${rowClass} js-grid-row-idx-${rdex} js-grid-row-id-${rowId}`
-                                    : `${rowClass} js-grid-row-idx-${rdex}`
+                                    ? `${rowClass}${rowStripeClass} js-grid-row-idx-${rdex} js-grid-row-id-${rowId}`
+                                    : `${rowClass}${rowStripeClass} js-grid-row-idx-${rdex}`
                             }
                             onClick={() => props.onRowClick?.(row)}
-                            style={{ cursor: props.onRowClick ? 'pointer' : undefined }}
+                            style={{
+                                cursor: props.onRowClick ? 'pointer' : undefined,
+                                ...(isLinear && themeStyles.bodyRowStripeBg && rdex % 2 === 0
+                                    ? { backgroundColor: themeStyles.bodyRowStripeBg }
+                                    : undefined),
+                            }}
                         >
                             {props.columns.map((column, cdex) => {
                                 const isRowNum = Boolean(column.__rownum__);
@@ -461,13 +470,7 @@ export default function JsGridTable(props: Props) {
                                             : column.render))
                                     : null;
 
-                                const rowStripe =
-                                    isLinear && themeStyles.bodyRowStripeBg && rdex % 2 === 0
-                                        ? { backgroundColor: themeStyles.bodyRowStripeBg }
-                                        : undefined;
-
                                 const tdStyle: CSSProperties = {
-                                    ...rowStripe,
                                     ...cellBorders,
                                     ...(hasW
                                         ? colWidthCss(wPx)

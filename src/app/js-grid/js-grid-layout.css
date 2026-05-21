@@ -45,6 +45,11 @@
     position: relative;
 }
 
+/* linear: 줄무늬는 tr에만 적용, td는 투명(틀 고정 셀은 인라인 배경 유지) */
+.js-grid-theme-linear .js-grid-body-row .js-grid-cell {
+    background-color: transparent;
+}
+
 .js-grid-theme-linear .js-grid-col-resize-grip {
     color: #9ca3af;
     font-size: 13px;
