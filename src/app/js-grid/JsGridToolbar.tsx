@@ -9,7 +9,7 @@ import {ToolbarHint} from "@bavuchoko/js-tooltip";
 import DownLoad from "../resources/icon/DownLoad.tsx";
 import Upload from "../resources/icon/Upload.tsx";
 import ColumnLock from "../resources/icon/ColumnLock.tsx";
-import {gridThemeShowsBorders, gridThemeStyles, resolveJsGridTheme, type JsGridTheme} from "./gridTheme.ts";
+import {gridThemeStyles, resolveJsGridTheme, type JsGridTheme} from "./gridTheme.ts";
 
 type Props = {
     fieldsBtnRef: RefObject<HTMLDivElement | null>;
@@ -56,7 +56,6 @@ export default function JsGridToolbar({
     style,
 }: Props) {
     const themeStyles = gridThemeStyles(theme);
-    const showBorders = gridThemeShowsBorders(theme);
     const showPseudoFullscreen = enablePseudoFullscreen !== false;
     const uploadSpinClass = useId().replace(/:/g, "");
     const downloadSpinClass = useId().replace(/:/g, "");
@@ -274,7 +273,17 @@ export default function JsGridToolbar({
                 )}
                 {showColumnFieldsMenu ? (
                     <>
-                        <div style={{borderLeft: showBorders ? '1px solid rgb(189, 194, 201)' : 'none', height:'16px', margin:'0 2px'}} />
+                        <div
+                            className="js-grid-toolbar-divider"
+                            aria-hidden
+                            style={{
+                                borderLeft: "1px solid #bdc2c9",
+                                height: 16,
+                                margin: "0 2px",
+                                flexShrink: 0,
+                                alignSelf: "center",
+                            }}
+                        />
                         <div ref={fieldsBtnRef} style={{ display: 'inline-flex', alignItems: 'center' }}>
                             <ToolbarHint text="컬럼 보이기/숨기기 및 순서 변경">
                                 <div
