@@ -1,4 +1,9 @@
 /** `toolbarStart` / `toolbarEnd` render prop에서 받는 API */
+export type ToolbarBodyOverlay = {
+    label: string;
+    accent?: string;
+};
+
 export type JsGridToolbarApi = {
     /**
      * Promise가 끝날 때까지 그리드 본문 블러·오버레이를 표시한다.
@@ -9,4 +14,6 @@ export type JsGridToolbarApi = {
         action: () => void | Promise<void>,
         accent?: string,
     ) => Promise<void>;
+    /** 본문 블러·오버레이만 직접 켜기/끄기 (`ToolbarUploadAction` 업로드 API 구간 등) */
+    setBodyOverlay: (overlay: ToolbarBodyOverlay | null) => void;
 };

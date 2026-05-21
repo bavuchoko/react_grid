@@ -1,6 +1,8 @@
 import type {Header, HeaderState} from "./app/type/Type.ts";
 import JsGrid from "./app/JsGrid.tsx";
 import ToolbarAsyncAction from "./app/js-grid/ToolbarAsyncAction.tsx";
+import ToolbarUploadAction from "./app/js-grid/ToolbarUploadAction.tsx";
+import DownLoad from "./app/resources/icon/DownLoad.tsx";
 import {useCallback, useMemo, useState} from "react";
 import {applyHeaderStateToHeader} from "./app/index.ts";
 
@@ -2146,25 +2148,25 @@ const App = () => {
         },
         [headerApi],
     );
-    const onUploadFiles = useCallback(async (files: File[]) => {
-        await new Promise((r) => setTimeout(r, 1500));
-        console.log(
-            "업로드 완료 샘플",
-            files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
-        );
-    }, []);
-    const onHeaderReset = useCallback(async () => {
-        await headerApi([]);
-    }, [headerApi]);
-    const onDownloadClick = useCallback(async () => {
-        await new Promise((r) => setTimeout(r, 1500));
-        console.log("download Clicked");
-    }, []);
-
     const delay = useCallback(
         (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
         [],
     );
+
+    const onUploadConfirm = useCallback(async (files: File[]) => {
+        await delay(1500);
+        console.log(
+            "업로드 완료 샘플",
+            files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+        );
+    }, [delay]);
+    const onHeaderReset = useCallback(async () => {
+        await headerApi([]);
+    }, [headerApi]);
+    const onCustomDownloadClick = useCallback(async () => {
+        await delay(1500);
+        console.log("다운로드(테스트) 완료");
+    }, [delay]);
 
     const onCustomSearchClick = useCallback(async () => {
         await delay(1200);
@@ -2186,7 +2188,6 @@ const App = () => {
         console.log("커스텀 사용자 메뉴(테스트) 완료");
     }, [delay]);
 
-    const onCreateClick = useCallback(() => console.log("create"), []);
     // api 요청 테스트용 삭제 메서드
     const deleteApi = useCallback((ids: number[]) =>
         new Promise<void>((resolve) => {
@@ -2261,6 +2262,24 @@ const App = () => {
                 )}
                 toolbarEnd={() => (
                     <div style={demoToolbarCustomGap}>
+                        {isAdmin ? (
+                            <>
+                                <ToolbarUploadAction
+                                    hint="업로드 (테스트)"
+                                    busyHint="업로드 중…"
+                                    overlayLabel="업로드 중…"
+                                    onUploadConfirm={onUploadConfirm}
+                                />
+                                <ToolbarAsyncAction
+                                    hint="다운로드 (테스트)"
+                                    busyHint="다운로드 중…"
+                                    overlayLabel="다운로드 중…"
+                                    onClick={onCustomDownloadClick}
+                                >
+                                    <DownLoad />
+                                </ToolbarAsyncAction>
+                            </>
+                        ) : null}
                         <ToolbarAsyncAction
                             hint="필터 (테스트)"
                             busyHint="필터 적용 중…"
@@ -2288,10 +2307,7 @@ const App = () => {
                 header={header}
                 data={pageData}
                 onHeaderSave={isAdmin ? onHeaderSave : undefined}
-                onUploadFiles={isAdmin ? onUploadFiles : undefined}
                 onHeaderReset={onHeaderReset}
-                onDownloadClick={isAdmin ? onDownloadClick : undefined}
-                onCreateClick={isAdmin ? onCreateClick : undefined}
                 onDeleteClick={isAdmin ? onDeleteClick : undefined}
                 onRowClick={onRowClick}
                 onPageChange={onPageChange}

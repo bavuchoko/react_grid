@@ -1,7 +1,7 @@
 <img width="701" height="462" alt="스크린샷 2026-04-28 오후 9 08 45" src="https://github.com/user-attachments/assets/169a8fd6-4fe6-4ce5-9865-d9b6476d5cfe" />
 # js-grid
 
-React/TypeScript 기반의 그리드 컴포넌트(`JsGrid`)입니다. 컬럼 표시/숨김, 순서 변경, 고정(Alt+클릭), 정렬, 페이지네이션, 선택 삭제, 툴바 액션(다운로드/업로드/추가) 등을 제공합니다.
+React/TypeScript 기반의 그리드 컴포넌트(`JsGrid`)입니다. 컬럼 표시/숨김, 순서 변경, 고정(Alt+클릭), 정렬, 페이지네이션, 선택 삭제, 내장 툴바(삭제·컬럼 설정 등), 커스텀 툴바(`ToolbarAsyncAction`·`ToolbarUploadAction`) 등을 제공합니다.
 
 
 ## 개발 실행
@@ -92,11 +92,8 @@ const header: Header[] = [
 - **`onPageChange?: (pageable: Page) => void`**: 페이지/정렬 변경 시 호출 (서버 페이징 연결용)
 - **`onHeaderSave?: (headers: HeaderState[]) => void`**: 컬럼 visible 상태 저장 (현재 컬럼 설정 저장)
 - **`onHeaderReset?: () => void | Promise<void>`**: 컬럼 설정 메뉴에서 "초기화" 클릭 시 호출. `async`/`Promise` 처리 중에는 저장과 동일하게 툴바·본문 로딩이 표시된다.
-- **`onDownloadClick?: () => void | Promise<void>`**: 툴바 다운로드 아이콘 클릭. `async`/`Promise` 처리 중에는 툴바 스피너와 본문(테이블·페이지네이션) 블러·「다운로드 중…」 오버레이가 표시된다.
-- **`onUploadFiles?: (files: File[]) => void | Promise<void>`**: 업로드 패널에서 전송 시 호출. 처리 중 본문 블러·「업로드 중…」 오버레이(툴바 스피너 포함).
 - **`onRowClick?: (row: unknown) => void`**: 체크박스를 제외한 행 클릭 시 호출 (클릭된 행의 데이터 객체 전달)
   - `Header.render`가 있는 셀은 기본적으로 `onRowClick`으로 이벤트가 전파되지 않습니다.
-- **`onCreateClick?: () => void`**: 툴바 추가(연필) 아이콘 클릭
 - **`onDeleteClick?: (rows: unknown[]) => void | Promise<void>`**: 툴바 삭제(휴지통) 클릭. `Promise`가 끝날 때까지 로딩·그리드 블러가 유지된다.
   - 전달값은 **선택된 행 데이터 객체 배열**입니다.
   - 1개를 선택해도 **항상 배열**로 전달됩니다.
@@ -121,7 +118,7 @@ const header: Header[] = [
 
 ### 툴바 커스텀 아이콘 / UI
 
-그리드 기본 툴바(추가·다운로드·업로드·삭제·컬럼·전체화면 등) 외에 **사용자 정의 버튼·아이콘**을 넣을 수 있습니다.
+그리드 **기본 툴바**는 삭제(선택 시)·컬럼 설정·전체화면 등입니다. **다운로드·업로드·필터·행 추가** 등은 `toolbarStart` / `toolbarEnd`에 커스텀 컴포넌트로 넣습니다.
 
 | Prop | 타입 | 위치 |
 |------|------|------|
@@ -132,7 +129,7 @@ const header: Header[] = [
 
 #### `ToolbarAsyncAction`으로 감싸서 넣기 (권장)
 
-API 호출 등 **`Promise`가 끝날 때까지** 다운로드·업로드와 같은 로딩(아이콘 스피너, 필요 시 본문 블러)을 쓰려면, **커스텀 아이콘을 `ToolbarAsyncAction`으로 감싼 뒤** `toolbarStart` / `toolbarEnd`에 넣으면 됩니다.
+API 호출 등 **`Promise`가 끝날 때까지** 로딩(아이콘 스피너, 필요 시 본문 블러)을 쓰려면, **커스텀 아이콘을 `ToolbarAsyncAction`으로 감싼 뒤** `toolbarStart` / `toolbarEnd`에 넣으면 됩니다.
 
 ```tsx
 import JsGrid, { ToolbarAsyncAction } from "@bavuchoko/js-grid";
@@ -141,16 +138,21 @@ import JsGrid, { ToolbarAsyncAction } from "@bavuchoko/js-grid";
   header={header}
   data={data}
   toolbarEnd={() => (
-    <ToolbarAsyncAction
-      hint="새로고침"
-      busyHint="새로고침 중…"
-      overlayLabel="새로고침 중…"
-      onClick={async () => {
-        await refreshList();
-      }}
-    >
-      <RefreshIcon />
-    </ToolbarAsyncAction>
+    <>
+      <ToolbarAsyncAction
+        hint="다운로드"
+        busyHint="다운로드 중…"
+        overlayLabel="다운로드 중…"
+        onClick={async () => {
+          await exportExcel();
+        }}
+      >
+        <DownloadIcon />
+      </ToolbarAsyncAction>
+      <ToolbarAsyncAction hint="새로고침" onClick={onRefresh}>
+        <RefreshIcon />
+      </ToolbarAsyncAction>
+    </>
   )}
 />
 ```
@@ -167,6 +169,41 @@ import JsGrid, { ToolbarAsyncAction } from "@bavuchoko/js-grid";
 
 - `onClick`이 **동기만** 실행되면 스피너가 거의 보이지 않을 수 있습니다.
 - `overlayLabel` + 본문 블러를 쓰려면 `toolbarStart` / `toolbarEnd`를 **함수형** `() => (...)` 으로 넘기는 것을 권장합니다.
+
+#### `ToolbarUploadAction` — Excel 업로드 패널
+
+클릭 시 **내장과 동일한 업로드 패널**(파일 목록·Excel `accept`·다중 업로드·패널 내 업로드 버튼)이 열립니다. 예전 `onUploadFiles` prop 대신 사용합니다.
+
+```tsx
+import JsGrid, { ToolbarUploadAction, DEFAULT_EXCEL_UPLOAD_ACCEPT } from "@bavuchoko/js-grid";
+
+<JsGrid
+  header={header}
+  data={data}
+  toolbarEnd={() => (
+    <ToolbarUploadAction
+      hint="업로드"
+      busyHint="업로드 중…"
+      overlayLabel="업로드 중…"
+      accept={DEFAULT_EXCEL_UPLOAD_ACCEPT}
+      multiple={false}
+      onUploadConfirm={async (files) => {
+        await uploadApi(files);
+      }}
+    />
+  )}
+/>
+```
+
+| `ToolbarUploadAction` prop | 설명 |
+|----------------------------|------|
+| **`onUploadConfirm`** | 패널에서 업로드 확인 시 `(files: File[]) => void \| Promise<void>`. resolve 시 패널 닫힘, reject 시 패널에 오류 |
+| **`accept`** | `<input accept>` (기본 Excel 허용 문자열) |
+| **`multiple`** | 다중 파일 (기본 `false`) |
+| **`hint` / `busyHint` / `overlayLabel`** | 툴팁·본문 블러 문구 |
+| **children** | 업로드 아이콘 대체 UI (생략 시 기본 업로드 아이콘) |
+
+`toolbarEnd`는 **함수형** `() => (...)` 으로 넘겨야 업로드 API 처리 중 본문 블러가 연동됩니다.
 
 #### 아이콘 여러 개
 
@@ -186,17 +223,17 @@ import JsGrid, { ToolbarAsyncAction } from "@bavuchoko/js-grid";
   )}
   toolbarEnd={() => (
     <>
+      <ToolbarUploadAction onUploadConfirm={onUpload} />
       <ToolbarAsyncAction hint="필터" onClick={onFilter}>
         <FilterIcon />
-      </ToolbarAsyncAction>
-      <ToolbarAsyncAction hint="사용자" overlayLabel="불러오는 중…" onClick={onUser}>
-        <UserIcon />
       </ToolbarAsyncAction>
     </>
   )}
 />
 ```
 
+- **내장**: `onDeleteClick`, `onHeaderSave` …
+- **커스텀**: `ToolbarUploadAction`, `ToolbarAsyncAction` …
 - 왼쪽·오른쪽에 나눠 넣으려면 `toolbarStart` / `toolbarEnd`를 각각 사용합니다.
 - 동시에 여러 API를 돌리지 않도록, 필요하면 앱에서 클릭 가드·`disabled`를 추가하세요.
 
@@ -218,9 +255,9 @@ import JsGrid, { ToolbarAsyncAction } from "@bavuchoko/js-grid";
 
 커스텀 영역은 클래스 `js-grid-toolbar-custom`, `js-grid-toolbar-custom-start`, `js-grid-toolbar-custom-end`로 감싸져 있어 필요 시 CSS로 간격·정렬을 조정할 수 있습니다.
 
-#### 본문 블러만 직접 제어 (`runToolbarAction`)
+#### 본문 블러만 직접 제어 (`runToolbarAction` / `setBodyOverlay`)
 
-아이콘 UI는 직접 만들고, 테이블 블러·오버레이만 그리드에 맡길 때:
+아이콘 UI는 직접 만들고, 테이블 블러·오버레이만 그리드에 맡길 때 (`ToolbarUploadAction`은 `setBodyOverlay`를 내부에서 사용):
 
 ```tsx
 import type { JsGridToolbarApi } from "@bavuchoko/js-grid";
@@ -241,7 +278,7 @@ import type { JsGridToolbarApi } from "@bavuchoko/js-grid";
 />
 ```
 
-패키지 export: `JsGrid`, `ToolbarAsyncAction`, `useJsGridToolbar`, `JsGridToolbarApi`, `JsGridToolbarSlot`
+패키지 export: `JsGrid`, `ToolbarAsyncAction`, `ToolbarUploadAction`, `DEFAULT_EXCEL_UPLOAD_ACCEPT`, `useJsGridToolbar`, `JsGridToolbarApi`, `JsGridToolbarSlot`
 
 ## UI 기능
 

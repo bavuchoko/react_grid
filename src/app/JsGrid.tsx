@@ -12,8 +12,6 @@ import {
 import JsGridTable from "./js-grid/JsGridTable.tsx";
 import JsGridToolbar from "./js-grid/JsGridToolbar.tsx";
 import Pagination from "./js-grid/Pagination.tsx";
-import { DEFAULT_EXCEL_UPLOAD_ACCEPT } from "./js-grid/excelUploadConstraints.ts";
-import UploadFilePanel from "./js-grid/UploadFilePanel.tsx";
 import {useColumnWidths} from "./js-grid/useColumnWidths.ts";
 import {useFreezeColumns} from "./js-grid/useFreezeColumns.ts";
 import {gridThemeContainerBorder, resolveJsGridTheme} from "./js-grid/gridTheme.ts";
@@ -71,8 +69,6 @@ const JsGrid =(props:GridType)=> {
     const rootRef = useRef<HTMLDivElement | null>(null);
     const gridOverlaySpinClass = useId().replace(/:/g, "");
     const [deleteBusy, setDeleteBusy] = useState(false);
-    const [downloadBusy, setDownloadBusy] = useState(false);
-
     const [userColumns, setUserColumns] = useState<UserColumn[]>([]);
 
     const keysSig = useMemo(
@@ -159,28 +155,6 @@ const JsGrid =(props:GridType)=> {
     const [fieldsMenuPos, setFieldsMenuPos] = useState<{ top: number; right: number } | null>(null);
     const fieldsBtnRef = useRef<HTMLDivElement | null>(null);
     const dragKeyRef = useRef<string | null>(null);
-    const uploadBtnRef = useRef<HTMLDivElement | null>(null);
-
-    const [isUploadPanelOpen, setIsUploadPanelOpen] = useState(false);
-    const [uploadPanelPos, setUploadPanelPos] = useState<{ top: number; right: number } | null>(null);
-    const [uploadPanelBusy, setUploadPanelBusy] = useState(false);
-
-    const toggleUploadPanel = useCallback((e: { stopPropagation: () => void }) => {
-        e.stopPropagation();
-        if (uploadPanelBusy || downloadBusy || fieldsActionBusy) return;
-        setIsFieldsMenuOpen(false);
-        const rect = uploadBtnRef.current?.getBoundingClientRect();
-        if (rect) {
-            setUploadPanelPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
-        }
-        setIsUploadPanelOpen((v) => !v);
-    }, [uploadPanelBusy, downloadBusy, fieldsActionBusy]);
-
-    const handleUploadConfirm = useCallback(
-        (files: File[]) => Promise.resolve(props.onUploadFiles?.(files)),
-        [props.onUploadFiles],
-    );
-
     useEffect(() => {
         if (!isFieldsMenuOpen) return;
 
@@ -206,35 +180,6 @@ const JsGrid =(props:GridType)=> {
             window.removeEventListener('keydown', onKey);
         };
     }, [isFieldsMenuOpen]);
-
-    useEffect(() => {
-        if (!isUploadPanelOpen) return;
-        const onDown = (e: MouseEvent) => {
-            if (uploadPanelBusy || downloadBusy) return;
-
-            const target = e.target as Node | null;
-            if (!target) return;
-
-            if (uploadBtnRef.current?.contains(target)) return;
-            const panelEl = document.querySelector('[data-jsgrid-upload-panel="1"]');
-            if (panelEl && panelEl.contains(target)) return;
-            setIsUploadPanelOpen(false);
-        };
-
-        const onKey = (e: KeyboardEvent) => {
-            if (uploadPanelBusy || downloadBusy) return;
-            if (e.key === "Escape") setIsUploadPanelOpen(false);
-        };
-
-        window.addEventListener("mousedown", onDown);
-        window.addEventListener("keydown", onKey);
-
-        return () => {
-            window.removeEventListener("mousedown", onDown);
-            window.removeEventListener("keydown", onKey);
-        };
-
-    }, [isUploadPanelOpen, uploadPanelBusy, downloadBusy]);
 
     const { freezeUntilIndex, setFreezeUntilIndex } = useFreezeColumns(columns.length);
     const freezeActive = freezeUntilIndex != null;
@@ -343,17 +288,6 @@ const JsGrid =(props:GridType)=> {
         setSelectedRowIndexes(new Set());
     }
 
-    const handleDownloadClick = useCallback(async () => {
-        if (downloadBusy) return;
-        if (!props.onDownloadClick) return;
-        setDownloadBusy(true);
-        try {
-            await Promise.resolve(props.onDownloadClick());
-        } finally {
-            setDownloadBusy(false);
-        }
-    }, [downloadBusy, props.onDownloadClick]);
-
     const handleDeleteSelected = useCallback(async () => {
         if (deleteBusy) return;
         if (!props.onDeleteClick) return;
@@ -409,7 +343,19 @@ const JsGrid =(props:GridType)=> {
         [],
     );
 
-    const toolbarApi = useMemo(() => ({ runToolbarAction }), [runToolbarAction]);
+    const setBodyOverlay = useCallback(
+        (overlay: { label: string; accent?: string } | null) => {
+            setToolbarOverlay(
+                overlay ? { label: overlay.label, accent: overlay.accent ?? "#2563eb" } : null,
+            );
+        },
+        [],
+    );
+
+    const toolbarApi = useMemo(
+        () => ({ runToolbarAction, setBodyOverlay }),
+        [runToolbarAction, setBodyOverlay],
+    );
 
     const renderToolbarSlot = useCallback(
         (slot?: JsGridToolbarSlot) => {
@@ -431,12 +377,10 @@ const JsGrid =(props:GridType)=> {
     const gridBodyOverlay = useMemo(() => {
         if (toolbarOverlay) return toolbarOverlay;
         if (deleteBusy) return { label: "삭제 중...", accent: "#ef4444" };
-        if (downloadBusy) return { label: "다운로드 중...", accent: "#2563eb" };
-        if (uploadPanelBusy) return { label: "업로드 중...", accent: "#2563eb" };
         if (fieldsSaveBusy) return { label: "저장 중...", accent: "#2563eb" };
         if (fieldsResetBusy) return { label: "초기화 중...", accent: "#2563eb" };
         return null;
-    }, [toolbarOverlay, deleteBusy, downloadBusy, uploadPanelBusy, fieldsSaveBusy, fieldsResetBusy]);
+    }, [toolbarOverlay, deleteBusy, fieldsSaveBusy, fieldsResetBusy]);
     const gridBodyBusy = gridBodyOverlay != null;
 
     return (
@@ -487,12 +431,6 @@ const JsGrid =(props:GridType)=> {
                     showColumnFieldsMenu={Boolean(props.onHeaderSave)}
                     isPseudoFullscreen={isPseudoFullscreen}
                     enablePseudoFullscreen={enablePseudoFullscreen}
-                    onDownLoadClick={props.onDownloadClick ? handleDownloadClick : undefined}
-                    downloadBusy={props.onDownloadClick ? downloadBusy : undefined}
-                    uploadBtnRef={props.onUploadFiles ? uploadBtnRef : undefined}
-                    onToggleUploadPanel={props.onUploadFiles ? toggleUploadPanel : undefined}
-                    uploadBusy={props.onUploadFiles ? uploadPanelBusy : undefined}
-                    onCreateClick={props.onCreateClick}
                     onTrashClick={props.onDeleteClick ? handleDeleteSelected : undefined}
                     trashBusy={deleteBusy}
                     trashDisabled={selectedRowIndexes.size === 0 || deleteBusy}
@@ -501,8 +439,7 @@ const JsGrid =(props:GridType)=> {
                     onToggleFieldsMenu={(e) => {
                         e.stopPropagation();
                         if (!props.onHeaderSave) return;
-                        if (uploadPanelBusy || fieldsActionBusy || downloadBusy) return;
-                        setIsUploadPanelOpen(false);
+                        if (fieldsActionBusy) return;
                         const rect = fieldsBtnRef.current?.getBoundingClientRect();
                         if (rect) {
                             setFieldsMenuPos({
@@ -516,18 +453,6 @@ const JsGrid =(props:GridType)=> {
                     toolbarStart={toolbarStartNode}
                     toolbarEnd={toolbarEndNode}
                 />
-
-                {props.onUploadFiles ? (
-                    <UploadFilePanel
-                        open={isUploadPanelOpen}
-                        pos={uploadPanelPos}
-                        accept={props.uploadAccept ?? DEFAULT_EXCEL_UPLOAD_ACCEPT}
-                        multiple={props.uploadMultiple ?? false}
-                        onBusyChange={setUploadPanelBusy}
-                        onUploadConfirm={handleUploadConfirm}
-                        onClose={() => setIsUploadPanelOpen(false)}
-                    />
-                ) : null}
 
                 <ColumnFieldsMenu
                     open={isFieldsMenuOpen}

@@ -4,10 +4,7 @@ import Fields from "../resources/icon/Fields.tsx";
 import Expand from "../resources/icon/Expand.tsx";
 import Shrink from "../resources/icon/Shrink.tsx";
 import Trash from "../resources/icon/Trash.tsx";
-import Pencil from "../resources/icon/Pencil.tsx";
 import {ToolbarHint} from "@bavuchoko/js-tooltip";
-import DownLoad from "../resources/icon/DownLoad.tsx";
-import Upload from "../resources/icon/Upload.tsx";
 import ColumnLock from "../resources/icon/ColumnLock.tsx";
 import {gridThemeStyles, resolveJsGridTheme, type JsGridTheme} from "./gridTheme.ts";
 
@@ -17,15 +14,6 @@ type Props = {
     onTogglePseudoFullscreen: () => void;
     isPseudoFullscreen: boolean;
     enablePseudoFullscreen?: boolean;
-    onDownLoadClick?: () => void;
-    /** `onDownLoadClick` API 처리 중일 때 다운로드 아이콘 로딩 표시 */
-    downloadBusy?: boolean;
-    uploadBtnRef?: RefObject<HTMLDivElement | null>;
-    /** 업로드 아이콘 클릭 — 부모에서 첨부 패널 표시 여부 등 처리 */
-    onToggleUploadPanel?: (e: MouseEvent) => void;
-    /** 패널에서 업로드 요청 처리 중일 때 툴바에 로딩 표시 */
-    uploadBusy?: boolean;
-    onCreateClick?: () => void;
     /** 선택된 행 삭제(콜백은 부모에서 `onDelete`와 연결) */
     onTrashClick?: () => void;
     trashBusy?: boolean;
@@ -47,12 +35,6 @@ export default function JsGridToolbar({
     onTogglePseudoFullscreen,
     isPseudoFullscreen,
     enablePseudoFullscreen,
-    onDownLoadClick,
-    downloadBusy,
-    uploadBtnRef,
-    onToggleUploadPanel,
-    uploadBusy,
-    onCreateClick,
     onTrashClick,
     trashBusy,
     trashDisabled,
@@ -66,8 +48,6 @@ export default function JsGridToolbar({
 }: Props) {
     const themeStyles = gridThemeStyles(theme);
     const showPseudoFullscreen = enablePseudoFullscreen !== false;
-    const uploadSpinClass = useId().replace(/:/g, "");
-    const downloadSpinClass = useId().replace(/:/g, "");
     const fieldsSpinClass = useId().replace(/:/g, "");
     const trashSpinClass = useId().replace(/:/g, "");
 
@@ -85,18 +65,6 @@ export default function JsGridToolbar({
             }}
         >
             <style>{`
-                @keyframes jsgrid-toolbar-spin-${uploadSpinClass} {
-                    to { transform: rotate(360deg); }
-                }
-                .jsgrid-toolbar-spin-dot-${uploadSpinClass} {
-                    animation: jsgrid-toolbar-spin-${uploadSpinClass} 0.75s linear infinite;
-                }
-                @keyframes jsgrid-toolbar-spin-${downloadSpinClass} {
-                    to { transform: rotate(360deg); }
-                }
-                .jsgrid-toolbar-spin-dot-${downloadSpinClass} {
-                    animation: jsgrid-toolbar-spin-${downloadSpinClass} 0.75s linear infinite;
-                }
                 @keyframes jsgrid-toolbar-spin-${fieldsSpinClass} {
                     to { transform: rotate(360deg); }
                 }
@@ -131,124 +99,6 @@ export default function JsGridToolbar({
                             {toolbarEnd}
                         </div>
                     ) : null}
-
-                {onCreateClick && (
-                    <>
-                        <ToolbarHint text="새 데이터 추가">
-                            <Pencil
-                                style={{ width: '18px', cursor: 'pointer' }}
-                                onClick={() => onCreateClick()}
-                            />
-                        </ToolbarHint>
-
-                    </>
-                )}
-                {(onToggleUploadPanel || onDownLoadClick) && (
-                    <>
-                        {onToggleUploadPanel && uploadBtnRef && (
-                            <ToolbarHint text={uploadBusy ? "업로드 중…" : "업로드"}>
-                                <div
-                                    ref={uploadBtnRef}
-                                    style={{
-                                        position: "relative",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        width: 18,
-                                        height: 18,
-                                        cursor: uploadBusy ? "wait" : "pointer",
-                                    }}
-                                    onClick={(e) => {
-                                        if (uploadBusy) {
-                                            e.stopPropagation();
-                                            return;
-                                        }
-                                        onToggleUploadPanel(e);
-                                    }}
-                                >
-                                    <Upload
-                                        style={{
-                                            width: "18px",
-                                            cursor: uploadBusy ? "wait" : "pointer",
-                                            opacity: uploadBusy ? 0.35 : 1,
-                                            flexShrink: 0,
-                                        }}
-                                        aria-busy={uploadBusy ?? false}
-                                        aria-live={uploadBusy ? "polite" : undefined}
-                                    />
-                                    {uploadBusy ? (
-                                        <span
-                                            className={`jsgrid-toolbar-spin-dot-${uploadSpinClass}`}
-                                            style={{
-                                                position: "absolute",
-                                                inset: 0,
-                                                margin: "auto",
-                                                width: 14,
-                                                height: 14,
-                                                borderRadius: "50%",
-                                                border: "2px solid #e5e7eb",
-                                                borderTopColor: "#2563eb",
-                                                boxSizing: "border-box",
-                                                pointerEvents: "none",
-                                            }}
-                                            aria-hidden
-                                        />
-                                    ) : null}
-                                </div>
-                            </ToolbarHint>
-                        )}
-                        {onDownLoadClick && (
-                            <ToolbarHint text={downloadBusy ? "다운로드 중…" : "다운로드"}>
-                                <div
-                                    style={{
-                                        position: "relative",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        width: 18,
-                                        height: 18,
-                                        cursor: downloadBusy ? "wait" : "pointer",
-                                    }}
-                                    onClick={() => {
-                                        if (downloadBusy) return;
-                                        onDownLoadClick();
-                                    }}
-                                >
-                                    <DownLoad
-                                        style={{
-                                            width: "18px",
-                                            cursor: downloadBusy ? "wait" : "pointer",
-                                            opacity: downloadBusy ? 0.35 : 1,
-                                            flexShrink: 0,
-                                        }}
-                                        aria-busy={downloadBusy ?? false}
-                                        aria-live={downloadBusy ? "polite" : undefined}
-                                    />
-                                    {downloadBusy ? (
-                                        <span
-                                            className={`jsgrid-toolbar-spin-dot-${downloadSpinClass}`}
-                                            style={{
-                                                position: "absolute",
-                                                inset: 0,
-                                                margin: "auto",
-                                                width: 14,
-                                                height: 14,
-                                                borderRadius: "50%",
-                                                border: "2px solid #e5e7eb",
-                                                borderTopColor: "#2563eb",
-                                                boxSizing: "border-box",
-                                                pointerEvents: "none",
-                                            }}
-                                            aria-hidden
-                                        />
-                                    ) : null}
-                                </div>
-                            </ToolbarHint>
-                        )}
-
-
-                    </>
-                )}
 
                 {onTrashClick && (
                     <>
