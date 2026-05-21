@@ -3,7 +3,6 @@ import JsGrid from "./app/JsGrid.tsx";
 import ToolbarAsyncAction from "./app/js-grid/ToolbarAsyncAction.tsx";
 import ToolbarDataTransfer from "./app/js-grid/ToolbarDataTransfer.tsx";
 import DownLoad from "./app/resources/icon/DownLoad.tsx";
-import Trash from "./app/resources/icon/Trash.tsx";
 import {useCallback, useMemo, useState} from "react";
 import {applyHeaderStateToHeader} from "./app/index.ts";
 
