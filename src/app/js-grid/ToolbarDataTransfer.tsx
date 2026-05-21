@@ -118,8 +118,6 @@ export default function ToolbarDataTransfer({
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 18,
-                height: 18,
                 cursor,
                 ...style,
             }}

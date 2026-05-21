@@ -2268,7 +2268,7 @@ const App = () => {
                                     overlayLabel="삭제 중…"
                                     onTransfer={onDeleteTransfer}
                                 >
-                                    <Trash style={{ width: 18, flexShrink: 0 }} />
+                                    <button className={` w-8 border rounded-4 text-black `}>삭제</button>
                                 </ToolbarDataTransfer>
                                 <ToolbarAsyncAction
                                     hint="다운로드 (테스트)"
