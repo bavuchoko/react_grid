@@ -192,6 +192,40 @@ function UserIcon(props: { onClick?: () => void }) {
 
 커스텀 영역은 클래스 `js-grid-toolbar-custom`, `js-grid-toolbar-custom-start`, `js-grid-toolbar-custom-end`로 감싸져 있어 필요 시 CSS로 간격·정렬을 조정할 수 있습니다.
 
+#### Promise 로딩 (아이콘 스피너 + 본문 블러)
+
+다운로드·업로드와 같이 **`Promise`가 끝날 때까지** 로딩을 보여 주려면 패키지에서 제공하는 **`ToolbarAsyncAction`**을 사용합니다.
+
+- **아이콘 위**: 기본 툴바와 동일한 파란 스피너
+- **본문**: `overlayLabel`을 넘기면 테이블·페이지네이션 블러 + 「…」 오버레이 (내장 액션과 동일)
+
+`toolbarStart` / `toolbarEnd`는 **함수형(render prop)**으로 넘기면 `runToolbarAction`으로 본문 오버레이만 직접 제어할 수도 있습니다.
+
+```tsx
+import JsGrid, { ToolbarAsyncAction } from "@bavuchoko/js-grid";
+
+<JsGrid
+  header={header}
+  data={data}
+  toolbarEnd={() => (
+    <ToolbarAsyncAction
+      hint="사용자 메뉴"
+      busyHint="불러오는 중…"
+      overlayLabel="불러오는 중…"
+      onClick={async () => {
+        await fetchUserMenu();
+      }}
+    >
+      <UserIcon />
+    </ToolbarAsyncAction>
+  )}
+/>
+```
+
+- `onClick`이 **동기**만 수행하면 스피너가 거의 보이지 않을 수 있습니다. API 호출은 `async` 함수로 `await`하세요.
+- `overlayLabel`을 생략하면 **아이콘 스피너만** 표시되고 본문 블러는 없습니다.
+- `ToolbarAsyncAction` 없이 직접 구현할 때: `toolbarStart={(api) => ...}` 안에서 `await api.runToolbarAction("처리 중…", () => myApi())` 호출.
+
 ## UI 기능
 
 - **정렬**: 헤더 클릭으로 정렬 변경(ASC/DESC)

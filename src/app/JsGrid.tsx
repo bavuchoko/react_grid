@@ -1,5 +1,6 @@
-import type {GridType, Header, HeaderState, JsGridTableColumn, Page} from "./type/Type.ts";
+import type {GridType, Header, HeaderState, JsGridTableColumn, JsGridToolbarSlot, Page} from "./type/Type.ts";
 import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react";
+import { JsGridToolbarProvider } from "./js-grid/JsGridToolbarContext.tsx";
 import ColumnFieldsMenu from "./js-grid/ColumnFieldsMenu.tsx";
 import {toHeaderState, type UserColumn} from "./js-grid/columnFieldsMenuModel.ts";
 import {
@@ -387,17 +388,59 @@ const JsGrid =(props:GridType)=> {
 
     const fieldsBusyLabel = fieldsSaveBusy ? "저장 중..." : fieldsResetBusy ? "초기화 중..." : undefined;
 
+    const [toolbarOverlay, setToolbarOverlay] = useState<{ label: string; accent: string } | null>(null);
+
+    const runToolbarAction = useCallback(
+        async (
+            label: string,
+            action: () => void | Promise<void>,
+            accent = "#2563eb",
+        ) => {
+            setToolbarOverlay({ label, accent });
+            await new Promise<void>((resolve) => {
+                requestAnimationFrame(() => resolve());
+            });
+            try {
+                await Promise.resolve(action());
+            } finally {
+                setToolbarOverlay(null);
+            }
+        },
+        [],
+    );
+
+    const toolbarApi = useMemo(() => ({ runToolbarAction }), [runToolbarAction]);
+
+    const renderToolbarSlot = useCallback(
+        (slot?: JsGridToolbarSlot) => {
+            if (slot == null) return undefined;
+            return typeof slot === "function" ? slot(toolbarApi) : slot;
+        },
+        [toolbarApi],
+    );
+
+    const toolbarStartNode = useMemo(
+        () => renderToolbarSlot(props.toolbarStart),
+        [props.toolbarStart, renderToolbarSlot],
+    );
+    const toolbarEndNode = useMemo(
+        () => renderToolbarSlot(props.toolbarEnd),
+        [props.toolbarEnd, renderToolbarSlot],
+    );
+
     const gridBodyOverlay = useMemo(() => {
+        if (toolbarOverlay) return toolbarOverlay;
         if (deleteBusy) return { label: "삭제 중...", accent: "#ef4444" };
         if (downloadBusy) return { label: "다운로드 중...", accent: "#2563eb" };
         if (uploadPanelBusy) return { label: "업로드 중...", accent: "#2563eb" };
         if (fieldsSaveBusy) return { label: "저장 중...", accent: "#2563eb" };
         if (fieldsResetBusy) return { label: "초기화 중...", accent: "#2563eb" };
         return null;
-    }, [deleteBusy, downloadBusy, uploadPanelBusy, fieldsSaveBusy, fieldsResetBusy]);
+    }, [toolbarOverlay, deleteBusy, downloadBusy, uploadPanelBusy, fieldsSaveBusy, fieldsResetBusy]);
     const gridBodyBusy = gridBodyOverlay != null;
 
     return (
+        <JsGridToolbarProvider value={toolbarApi}>
             <div
                 className={`js-grid-container js-grid-theme-${gridTheme}`}
                 ref={rootRef}
@@ -470,8 +513,8 @@ const JsGrid =(props:GridType)=> {
                         setIsFieldsMenuOpen(v => !v);
                     }}
                     onTogglePseudoFullscreen={() => setIsPseudoFullscreen(v => !v)}
-                    toolbarStart={props.toolbarStart}
-                    toolbarEnd={props.toolbarEnd}
+                    toolbarStart={toolbarStartNode}
+                    toolbarEnd={toolbarEndNode}
                 />
 
                 {props.onUploadFiles ? (
@@ -665,6 +708,7 @@ const JsGrid =(props:GridType)=> {
                     ) : null}
                 </div>
             </div>
+        </JsGridToolbarProvider>
     );
 }
 
