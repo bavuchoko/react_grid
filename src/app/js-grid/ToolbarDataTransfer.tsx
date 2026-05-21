@@ -144,7 +144,6 @@ export default function ToolbarDataTransfer({
                     alignItems: "center",
                     justifyContent: "center",
                     opacity: busy || interactionDisabled ? 0.45 : 1,
-                    lineHeight: 0,
                 }}
             >
                 {children}
