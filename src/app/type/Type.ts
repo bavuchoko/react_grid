@@ -7,7 +7,7 @@ export type GridType ={
     /** resolve 시 저장 완료(컬럼 메뉴가 닫힌다). reject 시 메뉴는 열린 채로 오류 표시 가능. */
     onHeaderSave?: (headers: HeaderState[]) => void | Promise<void>
     /** 컬럼 설정 메뉴에서 "초기화" 클릭 시 호출된다. */
-    onHeaderReset?: () => void
+    onHeaderReset?: () => void | Promise<void>
     /** resolve/reject 시점까지 툴바 다운로드 아이콘에 로딩 스피너가 표시된다. */
     onDownloadClick?: () => void | Promise<void>
     /** 전달 시 툴바에 업로드 아이콘이 표시된다. 패널에서 목록 확인 후 업로드 버튼 클릭 시 한 번 호출된다. resolve 시 패널이 닫힌다. 오류 처리를 위해 거부(reject) 시 패널에 오류 텍스트를 보여 줄 수 있다. */

@@ -91,7 +91,7 @@ const header: Header[] = [
 
 - **`onPageChange?: (pageable: Page) => void`**: 페이지/정렬 변경 시 호출 (서버 페이징 연결용)
 - **`onHeaderSave?: (headers: HeaderState[]) => void`**: 컬럼 visible 상태 저장 (현재 컬럼 설정 저장)
-- **`onHeaderReset?: () => void`**: 컬럼 설정 메뉴에서 "초기화" 클릭 시 호출
+- **`onHeaderReset?: () => void | Promise<void>`**: 컬럼 설정 메뉴에서 "초기화" 클릭 시 호출. `async`/`Promise` 처리 중에는 저장과 동일하게 툴바·본문 로딩이 표시된다.
 - **`onDownloadClick?: () => void | Promise<void>`**: 툴바 다운로드 아이콘 클릭. `async`/`Promise` 처리 중에는 툴바 스피너와 본문(테이블·페이지네이션) 블러·「다운로드 중…」 오버레이가 표시된다.
 - **`onUploadFiles?: (files: File[]) => void | Promise<void>`**: 업로드 패널에서 전송 시 호출. 처리 중 본문 블러·「업로드 중…」 오버레이(툴바 스피너 포함).
 - **`onRowClick?: (row: unknown) => void`**: 체크박스를 제외한 행 클릭 시 호출 (클릭된 행의 데이터 객체 전달)
@@ -104,8 +104,6 @@ const header: Header[] = [
 
 ### 스타일
 
-- **`toolbarStart?: React.ReactNode`**: 툴바 왼쪽(헤더 고정 안내 옆) 커스텀 UI
-- **`toolbarEnd?: React.ReactNode`**: 툴바 오른쪽(기본 아이콘·컬럼 메뉴 뒤, 전체화면 앞) 커스텀 UI
 - **`style?: React.CSSProperties`**: `JsGrid` 루트 컨테이너 스타일 오버라이드
   - 기본 스타일은 유지되고, `style`을 넘기면 해당 값이 덮어써집니다.
   - pseudo fullscreen(전체화면)일 때는 레이아웃을 위해 일부 값(`width/height/position/zIndex/boxShadow` 등)이 강제로 적용됩니다.
@@ -120,6 +118,79 @@ const header: Header[] = [
   style={{ height: 500, borderRadius: 12 }}
 />
 ```
+
+### 툴바 커스텀 아이콘 / UI
+
+그리드 기본 툴바(추가·다운로드·업로드·삭제·컬럼·전체화면 등) 외에 **사용자 정의 버튼·아이콘·컴포넌트**를 넣을 수 있습니다. `ReactNode`이므로 버튼, SVG 아이콘, `@bavuchoko/js-tooltip`의 `ToolbarHint` 조합 등 자유롭게 구성하면 됩니다.
+
+| Prop | 위치 |
+|------|------|
+| **`toolbarStart`** | 툴바 **왼쪽** — 「헤더 고정」 안내(자물쇠) **오른쪽** |
+| **`toolbarEnd`** | 툴바 **오른쪽** — 기본 액션 아이콘들 **앞**(추가·다운로드·업로드·삭제·컬럼 메뉴·전체화면 **앞**) |
+
+아이콘 크기는 기본 툴바와 맞추려면 **약 18×18px**을 권장합니다.
+
+**왼쪽에 필터 버튼**
+
+```tsx
+<JsGrid
+  header={header}
+  data={data}
+  toolbarStart={
+    <button type="button" onClick={() => openFilter()}>
+      필터
+    </button>
+  }
+/>
+```
+
+**오른쪽에 사용자 아이콘(클릭 핸들러)**
+
+```tsx
+import { ToolbarHint } from "@bavuchoko/js-tooltip";
+
+function UserIcon(props: { onClick?: () => void }) {
+  return (
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      onClick={props.onClick}
+      style={{ cursor: "pointer" }}
+      aria-hidden
+    >
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+<JsGrid
+  header={header}
+  data={data}
+  toolbarEnd={
+    <ToolbarHint text="사용자 메뉴">
+      <UserIcon onClick={() => openUserMenu()} />
+    </ToolbarHint>
+  }
+/>
+```
+
+**양쪽 동시 사용**
+
+```tsx
+<JsGrid
+  header={header}
+  data={data}
+  toolbarStart={<MyFilterButton />}
+  toolbarEnd={<MyUserMenuIcon />}
+/>
+```
+
+커스텀 영역은 클래스 `js-grid-toolbar-custom`, `js-grid-toolbar-custom-start`, `js-grid-toolbar-custom-end`로 감싸져 있어 필요 시 CSS로 간격·정렬을 조정할 수 있습니다.
 
 ## UI 기능
 

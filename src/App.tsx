@@ -2132,7 +2132,9 @@ const App = () => {
             files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
         );
     }, []);
-    const onHeaderReset = useCallback(() => console.log("reset clicked"), []);
+    const onHeaderReset = useCallback(async () => {
+        await headerApi([]);
+    }, [headerApi]);
     const onDownloadClick = useCallback(async () => {
         await new Promise((r) => setTimeout(r, 1500));
         console.log("download Clicked");
@@ -2181,11 +2183,7 @@ const App = () => {
             <JsGrid
                 resizable={true}
                 theme={'linear'}
-                toolbarStart={
-                    <button type="button" onClick={() => console.log("필터")}>
-                        필터
-                    </button>
-                }
+
                 // style={{flex: "1 1 0%", minHeight: 0, width: "100%"}}
                 header={header}
                 data={pageData}

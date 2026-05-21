@@ -145,9 +145,11 @@ const JsGrid =(props:GridType)=> {
 
     const [isFieldsMenuOpen, setIsFieldsMenuOpen] = useState(false);
     const [fieldsSaveBusy, setFieldsSaveBusy] = useState(false);
+    const [fieldsResetBusy, setFieldsResetBusy] = useState(false);
     const [fieldsSaveError, setFieldsSaveError] = useState<string | null>(null);
-    const fieldsSaveBusyRef = useRef(fieldsSaveBusy);
-    fieldsSaveBusyRef.current = fieldsSaveBusy;
+    const fieldsActionBusy = fieldsSaveBusy || fieldsResetBusy;
+    const fieldsActionBusyRef = useRef(false);
+    fieldsActionBusyRef.current = fieldsActionBusy;
 
     useEffect(() => {
         if (isFieldsMenuOpen) setFieldsSaveError(null);
@@ -164,14 +166,14 @@ const JsGrid =(props:GridType)=> {
 
     const toggleUploadPanel = useCallback((e: { stopPropagation: () => void }) => {
         e.stopPropagation();
-        if (uploadPanelBusy || downloadBusy) return;
+        if (uploadPanelBusy || downloadBusy || fieldsActionBusy) return;
         setIsFieldsMenuOpen(false);
         const rect = uploadBtnRef.current?.getBoundingClientRect();
         if (rect) {
             setUploadPanelPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
         }
         setIsUploadPanelOpen((v) => !v);
-    }, [uploadPanelBusy, downloadBusy]);
+    }, [uploadPanelBusy, downloadBusy, fieldsActionBusy]);
 
     const handleUploadConfirm = useCallback(
         (files: File[]) => Promise.resolve(props.onUploadFiles?.(files)),
@@ -182,7 +184,7 @@ const JsGrid =(props:GridType)=> {
         if (!isFieldsMenuOpen) return;
 
         const onDown = (e: MouseEvent) => {
-            if (fieldsSaveBusyRef.current) return;
+            if (fieldsActionBusyRef.current) return;
             const target = e.target as Node | null;
             if (!target) return;
             if (fieldsBtnRef.current?.contains(target)) return;
@@ -192,7 +194,7 @@ const JsGrid =(props:GridType)=> {
         };
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                if (fieldsSaveBusyRef.current) return;
+                if (fieldsActionBusyRef.current) return;
                 setIsFieldsMenuOpen(false);
             }
         };
@@ -383,12 +385,16 @@ const JsGrid =(props:GridType)=> {
 
     const gridTheme = resolveJsGridTheme(props.theme);
 
+    const fieldsBusyLabel = fieldsSaveBusy ? "저장 중..." : fieldsResetBusy ? "초기화 중..." : undefined;
+
     const gridBodyOverlay = useMemo(() => {
         if (deleteBusy) return { label: "삭제 중...", accent: "#ef4444" };
         if (downloadBusy) return { label: "다운로드 중...", accent: "#2563eb" };
         if (uploadPanelBusy) return { label: "업로드 중...", accent: "#2563eb" };
+        if (fieldsSaveBusy) return { label: "저장 중...", accent: "#2563eb" };
+        if (fieldsResetBusy) return { label: "초기화 중...", accent: "#2563eb" };
         return null;
-    }, [deleteBusy, downloadBusy, uploadPanelBusy]);
+    }, [deleteBusy, downloadBusy, uploadPanelBusy, fieldsSaveBusy, fieldsResetBusy]);
     const gridBodyBusy = gridBodyOverlay != null;
 
     return (
@@ -447,10 +453,12 @@ const JsGrid =(props:GridType)=> {
                     onTrashClick={props.onDeleteClick ? handleDeleteSelected : undefined}
                     trashBusy={deleteBusy}
                     trashDisabled={selectedRowIndexes.size === 0 || deleteBusy}
+                    fieldsBusy={props.onHeaderSave ? fieldsActionBusy : undefined}
+                    fieldsBusyLabel={fieldsBusyLabel}
                     onToggleFieldsMenu={(e) => {
                         e.stopPropagation();
                         if (!props.onHeaderSave) return;
-                        if (uploadPanelBusy || fieldsSaveBusy || downloadBusy) return;
+                        if (uploadPanelBusy || fieldsActionBusy || downloadBusy) return;
                         setIsUploadPanelOpen(false);
                         const rect = fieldsBtnRef.current?.getBoundingClientRect();
                         if (rect) {
@@ -484,6 +492,7 @@ const JsGrid =(props:GridType)=> {
                     userColumns={userColumns}
                     dragKeyRef={dragKeyRef}
                     saveBusy={fieldsSaveBusy}
+                    resetBusy={fieldsResetBusy}
                     saveError={fieldsSaveError}
                     onReorder={(fromKey, toKey) => {
                         setUserColumns((prev) => {
@@ -500,17 +509,28 @@ const JsGrid =(props:GridType)=> {
                         setUserColumns((prev) => prev.map(x => x.key === key ? { ...x, visible } : x));
                     }}
                     onReset={
-                        props.onHeaderReset
-                            ? () => {
+                        props.onHeaderSave
+                            ? async () => {
                                 setFieldsSaveError(null);
-                                setUserColumns(
-                                    headerList.map((c) => ({
-                                        key: c.key,
-                                        label: String(c.label ?? c.key),
-                                        visible: true,
-                                    })),
-                                );
-                                props.onHeaderReset?.();
+                                setFieldsResetBusy(true);
+                                // busy UI가 그려진 뒤 컬럼/API 처리 (동기만 있으면 React가 한 번에 배치해 스피너가 안 보임)
+                                await new Promise<void>((resolve) => {
+                                    requestAnimationFrame(() => resolve());
+                                });
+                                try {
+                                    setUserColumns(
+                                        headerList.map((c) => ({
+                                            key: c.key,
+                                            label: String(c.label ?? c.key),
+                                            visible: true,
+                                        })),
+                                    );
+                                    if (props.onHeaderReset) {
+                                        await Promise.resolve(props.onHeaderReset());
+                                    }
+                                } finally {
+                                    setFieldsResetBusy(false);
+                                }
                             }
                             : undefined
                     }

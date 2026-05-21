@@ -32,6 +32,9 @@ type Props = {
     trashDisabled?: boolean;
     /** `onHeaderSave`를 넘긴 경우에만 컬럼(필드) 메뉴 버튼을 표시한다. */
     showColumnFieldsMenu?: boolean;
+    /** 컬럼 저장·초기화 API 처리 중일 때 필드 아이콘 로딩 표시 */
+    fieldsBusy?: boolean;
+    fieldsBusyLabel?: string;
     toolbarStart?: ReactNode;
     toolbarEnd?: ReactNode;
     theme?: JsGridTheme | string;
@@ -54,6 +57,8 @@ export default function JsGridToolbar({
     trashBusy,
     trashDisabled,
     showColumnFieldsMenu = false,
+    fieldsBusy,
+    fieldsBusyLabel,
     toolbarStart,
     toolbarEnd,
     theme,
@@ -63,6 +68,7 @@ export default function JsGridToolbar({
     const showPseudoFullscreen = enablePseudoFullscreen !== false;
     const uploadSpinClass = useId().replace(/:/g, "");
     const downloadSpinClass = useId().replace(/:/g, "");
+    const fieldsSpinClass = useId().replace(/:/g, "");
     const trashSpinClass = useId().replace(/:/g, "");
 
     return (
@@ -91,6 +97,12 @@ export default function JsGridToolbar({
                 .jsgrid-toolbar-spin-dot-${downloadSpinClass} {
                     animation: jsgrid-toolbar-spin-${downloadSpinClass} 0.75s linear infinite;
                 }
+                @keyframes jsgrid-toolbar-spin-${fieldsSpinClass} {
+                    to { transform: rotate(360deg); }
+                }
+                .jsgrid-toolbar-spin-dot-${fieldsSpinClass} {
+                    animation: jsgrid-toolbar-spin-${fieldsSpinClass} 0.75s linear infinite;
+                }
                 @keyframes jsgrid-toolbar-spin-${trashSpinClass} {
                     to { transform: rotate(360deg); }
                 }
@@ -112,6 +124,14 @@ export default function JsGridToolbar({
 
                 <div className="js-grid-toolbar-actions" style={{display: 'flex', alignItems:'center', gap:'16px', justifyContent:'end'}}>
 
+
+
+                    {toolbarEnd ? (
+                        <div className="js-grid-toolbar-custom js-grid-toolbar-custom-end">
+                            {toolbarEnd}
+                        </div>
+                    ) : null}
+
                 {onCreateClick && (
                     <>
                         <ToolbarHint text="새 데이터 추가">
@@ -123,7 +143,6 @@ export default function JsGridToolbar({
 
                     </>
                 )}
-
                 {(onToggleUploadPanel || onDownLoadClick) && (
                     <>
                         {onToggleUploadPanel && uploadBtnRef && (
@@ -293,24 +312,66 @@ export default function JsGridToolbar({
                                 alignSelf: "center",
                             }}
                         />
-                        <div ref={fieldsBtnRef} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                            <ToolbarHint text="컬럼 보이기/숨기기 및 순서 변경">
+                        <div ref={fieldsBtnRef} style={{ display: "inline-flex", alignItems: "center" }}>
+                            <ToolbarHint
+                                text={
+                                    fieldsBusy && fieldsBusyLabel
+                                        ? fieldsBusyLabel
+                                        : "컬럼 보이기/숨기기 및 순서 변경"
+                                }
+                            >
                                 <div
-                                    style={{ display: 'inline-flex', alignItems: 'center' }}
-                                    onClick={onToggleFieldsMenu}
+                                    style={{
+                                        position: "relative",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        width: 18,
+                                        height: 18,
+                                        cursor: fieldsBusy ? "wait" : "pointer",
+                                    }}
+                                    onClick={(e) => {
+                                        if (fieldsBusy) {
+                                            e.stopPropagation();
+                                            return;
+                                        }
+                                        onToggleFieldsMenu(e);
+                                    }}
                                 >
-                                    <Fields style={{width:'18px', cursor: 'pointer'}}/>
+                                    <Fields
+                                        style={{
+                                            width: "18px",
+                                            cursor: fieldsBusy ? "wait" : "pointer",
+                                            opacity: fieldsBusy ? 0.35 : 1,
+                                            flexShrink: 0,
+                                        }}
+                                        aria-busy={fieldsBusy ?? false}
+                                        aria-live={fieldsBusy ? "polite" : undefined}
+                                    />
+                                    {fieldsBusy ? (
+                                        <span
+                                            className={`jsgrid-toolbar-spin-dot-${fieldsSpinClass}`}
+                                            style={{
+                                                position: "absolute",
+                                                inset: 0,
+                                                margin: "auto",
+                                                width: 14,
+                                                height: 14,
+                                                borderRadius: "50%",
+                                                border: "2px solid #e5e7eb",
+                                                borderTopColor: "#2563eb",
+                                                boxSizing: "border-box",
+                                                pointerEvents: "none",
+                                            }}
+                                            aria-hidden
+                                        />
+                                    ) : null}
                                 </div>
                             </ToolbarHint>
                         </div>
                     </>
                 ) : null}
 
-                {toolbarEnd ? (
-                    <div className="js-grid-toolbar-custom js-grid-toolbar-custom-end">
-                        {toolbarEnd}
-                    </div>
-                ) : null}
 
                 {showPseudoFullscreen && (
                     isPseudoFullscreen ? (
