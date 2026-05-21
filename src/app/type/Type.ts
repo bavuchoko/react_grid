@@ -16,6 +16,13 @@ export type GridType ={
     onRowClick?: (row: unknown) => void
     /** `true`면 체크박스 열·행 선택 UI를 표시한다. 삭제 등은 `toolbarEnd`의 `ToolbarDataTransfer`로 처리. */
     enableRowSelection?: boolean
+    /**
+     * 행 선택 식별 필드명(기본 `id`). `getRowSelectionId`가 있으면 우선한다.
+     * 식별자가 없으면 페이지·인덱스 fallback — 조회 데이터가 바뀌면 선택이 초기화된다.
+     */
+    rowSelectionIdKey?: string
+    /** 행 객체에서 선택 키 추출(서버 고유 키가 `id`가 아닐 때) */
+    getRowSelectionId?: (row: unknown, rowIndex: number) => string | number | null | undefined
     /** false면 전체화면(pseudo fullscreen) 토글 UI/동작을 비활성화한다. (기본값: true) */
     enablePseudoFullscreen?: boolean
     /**

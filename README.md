@@ -95,6 +95,9 @@ const header: Header[] = [
 - **`onRowClick?: (row: unknown) => void`**: 체크박스를 제외한 행 클릭 시 호출 (클릭된 행의 데이터 객체 전달)
   - `Header.render`가 있는 셀은 기본적으로 `onRowClick`으로 이벤트가 전파되지 않습니다.
 - **`enableRowSelection?: boolean`**: `true`면 체크박스 열·행 선택 UI를 표시한다. 삭제·보내기 등은 `toolbarEnd`의 **`ToolbarDataTransfer`**로 처리한다(선택과 콜백을 분리).
+  - 선택 키는 기본 **`row.id`**(또는 `rowSelectionIdKey` / `getRowSelectionId`).
+  - **조회 데이터·페이지 메타가 바뀌면** 체크가 **전부 해제**된다(검색 조건 변경 후 잘못된 행 삭제 방지).
+  - **페이지 이동** 시에도 선택이 초기화된다.
 - **`enablePseudoFullscreen?: boolean`**: 전체화면(pseudo fullscreen) 토글 기능 사용 여부 (기본값: `true`)
 
 ### 스타일
@@ -337,7 +340,7 @@ import type { JsGridToolbarApi } from "@bavuchoko/js-grid";
     - 저장한 너비를 다시 적용하려면, 다음 렌더에서 해당 컬럼의 `header.width`(px)에 주입해 주세요.
 - **pseudo fullscreen**: 툴바의 전체화면 아이콘으로 토글 (ESC로 종료)
   - `enablePseudoFullscreen={false}`면 전체화면 버튼/동작이 비활성화됩니다.
-- **행 선택**: `enableRowSelection`이면 체크박스 컬럼이 나타납니다. 삭제 버튼은 `ToolbarDataTransfer`를 `toolbarEnd`에 넣습니다.
+- **행 선택**: `enableRowSelection`이면 체크박스 컬럼이 나타납니다. 선택은 행 **`id`**(등) 기준이며, 데이터 재조회·페이지 변경 시 선택이 초기화됩니다. 삭제 버튼은 `ToolbarDataTransfer`를 `toolbarEnd`에 넣습니다.
 
 ## 서버 페이징 연결 예시
 

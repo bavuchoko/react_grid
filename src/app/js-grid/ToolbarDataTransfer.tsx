@@ -1,4 +1,4 @@
-import { useId, useState, type CSSProperties, type ReactNode } from "react";
+import { isValidElement, useId, useState, type CSSProperties, type ReactNode } from "react";
 import { ToolbarHint } from "@bavuchoko/js-tooltip";
 import { useJsGridToolbar } from "./JsGridToolbarContext.tsx";
 import { useJsGridRowSelection } from "./JsGridRowSelectionContext.tsx";
@@ -12,6 +12,16 @@ function yieldToPaint(): Promise<void> {
 function joinClassNames(...parts: (string | undefined | false)[]): string | undefined {
     const s = parts.filter(Boolean).join(" ");
     return s || undefined;
+}
+
+/** 아이콘용 `lineHeight: 0`은 텍스트 버튼 높이를 무너뜀 */
+function isToolbarTextControl(child: ReactNode): boolean {
+    if (!isValidElement(child)) return false;
+    const type = child.type;
+    if (typeof type === "string") {
+        return type === "button" || type === "a";
+    }
+    return false;
 }
 
 export type ToolbarDataTransferContext = {
@@ -107,6 +117,7 @@ export default function ToolbarDataTransfer({
 
     const tooltip = busy && busyHint ? busyHint : hint;
     const customRender = typeof children === "function";
+    const textControl = !customRender && isToolbarTextControl(children);
 
     const control = customRender ? (
         children(ctx)
@@ -144,6 +155,7 @@ export default function ToolbarDataTransfer({
                     alignItems: "center",
                     justifyContent: "center",
                     opacity: busy || interactionDisabled ? 0.45 : 1,
+                    ...(textControl ? {} : { lineHeight: 0 }),
                 }}
             >
                 {children}

@@ -164,12 +164,13 @@ function HeaderColumnResizeHandle({
 }
 
 type RowSelectionProps = {
-    pageRowIds: number[];
-    selectedIds: ReadonlySet<number>;
+    /** 현재 페이지 각 행의 선택 키(행 `id` 등) */
+    pageRowKeys: readonly string[];
+    selectedKeys: ReadonlySet<string>;
     /** 현재 페이지 행이 모두 선택된 경우에만 true (일부만 선택이면 false) */
     headerChecked: boolean;
     onToggleAll: () => void;
-    onToggleRow: (id: number) => void;
+    onToggleRow: (key: string) => void;
 };
 
 type Props = {
@@ -284,7 +285,7 @@ export default function JsGridTable(props: Props) {
                                                 type="checkbox"
                                                 className="js-grid-chk-box"
                                                 checked={props.rowSelection.headerChecked}
-                                                disabled={props.rowSelection.pageRowIds.length === 0}
+                                                disabled={props.rowSelection.pageRowKeys.length === 0}
                                                 readOnly
                                                 style={{ pointerEvents: 'none' }}
                                             />
@@ -499,7 +500,9 @@ export default function JsGridTable(props: Props) {
                                     if (isCheckbox) {
                                         e.stopPropagation();
                                         if (!props.rowSelection) return;
-                                        props.rowSelection.onToggleRow(rdex);
+                                        props.rowSelection.onToggleRow(
+                                            props.rowSelection.pageRowKeys[rdex] ?? String(rdex),
+                                        );
                                         return;
                                     }
                                     if (column.render) {
@@ -513,7 +516,9 @@ export default function JsGridTable(props: Props) {
                                     <input
                                         type="checkbox"
                                         className="js-grid-chk-box"
-                                        checked={props.rowSelection.selectedIds.has(rdex)}
+                                        checked={props.rowSelection.selectedKeys.has(
+                                            props.rowSelection.pageRowKeys[rdex] ?? "",
+                                        )}
                                         readOnly
                                         style={{ pointerEvents: 'none' }}
                                     />

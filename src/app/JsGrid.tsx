@@ -20,6 +20,11 @@ import {
     computeLeftOffsets,
     getColumnFreezeStickyStyle,
 } from "./js-grid/columnLayout.ts";
+import {
+    buildRowSelectionDataSignature,
+    resolveRowSelectionKey,
+    type RowSelectionKey,
+} from "./js-grid/rowSelection.ts";
 import JsGridTable from "./js-grid/JsGridTable.tsx";
 import JsGridToolbar from "./js-grid/JsGridToolbar.tsx";
 import Pagination from "./js-grid/Pagination.tsx";
@@ -257,58 +262,101 @@ const JsGrid =(props:GridType)=> {
         props.onPageChange?.(next);
     }, [props.onPageChange]);
 
-    const [selectedRowIndexes, setSelectedRowIndexes] = useState<Set<number>>(() => new Set());
+    const rowSelectionIdKey = props.rowSelectionIdKey ?? "id";
+    const getRowSelectionId = props.getRowSelectionId;
+
+    const resolveKey = useCallback(
+        (row: unknown, rowIndex: number) =>
+            resolveRowSelectionKey({
+                row,
+                rowIndex,
+                pageNumber: currentPage0,
+                idKey: rowSelectionIdKey,
+                getRowSelectionId,
+            }),
+        [currentPage0, rowSelectionIdKey, getRowSelectionId],
+    );
+
+    const [selectedKeys, setSelectedKeys] = useState<Set<RowSelectionKey>>(() => new Set());
     const [selectionAnchor, setSelectionAnchor] = useState(() => ({
         page: page.pageNumber ?? 0,
         show: showRowSelection,
     }));
 
-    const pageRowIds = useMemo(() => {
-        // 선택은 `row.id`가 없어도 동작해야 하므로, 현재 페이지의 행 인덱스를 키로 사용한다.
-        return data.map((_, idx) => idx);
-    }, [data]);
+    const dataSelectionSignature = useMemo(
+        () =>
+            buildRowSelectionDataSignature({
+                data,
+                pageNumber: currentPage0,
+                totalElements: page.totalElements,
+                totalPages: page.totalPages,
+                idKey: rowSelectionIdKey,
+                getRowSelectionId,
+            }),
+        [
+            data,
+            currentPage0,
+            page.totalElements,
+            page.totalPages,
+            rowSelectionIdKey,
+            getRowSelectionId,
+        ],
+    );
+
+    const [prevDataSelectionSignature, setPrevDataSelectionSignature] = useState(
+        () => dataSelectionSignature,
+    );
+    if (prevDataSelectionSignature !== dataSelectionSignature) {
+        setPrevDataSelectionSignature(dataSelectionSignature);
+        setSelectedKeys(new Set());
+    }
+
+    const pageRowKeys = useMemo(
+        () => data.map((row, idx) => resolveKey(row, idx)),
+        [data, resolveKey],
+    );
 
     const headerChecked =
-        pageRowIds.length > 0 && pageRowIds.every((id) => selectedRowIndexes.has(id));
+        pageRowKeys.length > 0 && pageRowKeys.every((key) => selectedKeys.has(key));
 
     const toggleSelectAll = useCallback(() => {
-        setSelectedRowIndexes((prev) => {
+        setSelectedKeys((prev) => {
             const next = new Set(prev);
-            const allOn = pageRowIds.length > 0 && pageRowIds.every((id) => next.has(id));
+            const allOn = pageRowKeys.length > 0 && pageRowKeys.every((key) => next.has(key));
             if (allOn) {
-                for (const id of pageRowIds) next.delete(id);
+                for (const key of pageRowKeys) next.delete(key);
             } else {
-                for (const id of pageRowIds) next.add(id);
+                for (const key of pageRowKeys) next.add(key);
             }
             return next;
         });
-    }, [pageRowIds]);
+    }, [pageRowKeys]);
 
-    const toggleSelectRow = useCallback((id: number) => {
-        setSelectedRowIndexes((prev) => {
+    const toggleSelectRow = useCallback((key: RowSelectionKey) => {
+        setSelectedKeys((prev) => {
             const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
             return next;
         });
     }, []);
 
     if (selectionAnchor.page !== currentPage0 || selectionAnchor.show !== showRowSelection) {
         setSelectionAnchor({ page: currentPage0, show: showRowSelection });
-        setSelectedRowIndexes(new Set());
+        setSelectedKeys(new Set());
     }
 
-    const selectedRows = useMemo(
-        () =>
-            Array.from(selectedRowIndexes)
-                .sort((a, b) => a - b)
-                .map((i) => data[i])
-                .filter((v) => v !== undefined),
-        [selectedRowIndexes, data],
-    );
+    const selectedRows = useMemo(() => {
+        const rows: unknown[] = [];
+        for (let i = 0; i < data.length; i++) {
+            const key = pageRowKeys[i];
+            if (key != null && selectedKeys.has(key)) rows.push(data[i]);
+        }
+        return rows;
+    }, [data, pageRowKeys, selectedKeys]);
 
     const clearSelection = useCallback(() => {
-        setSelectedRowIndexes(new Set());
+        setSelectedKeys(new Set());
     }, []);
 
     const rowSelectionApi = useMemo((): JsGridRowSelectionApi | null => {
@@ -324,13 +372,13 @@ const JsGrid =(props:GridType)=> {
     const rowSelection = useMemo(() => {
         if (!showRowSelection) return undefined;
         return {
-            pageRowIds,
-            selectedIds: selectedRowIndexes,
+            pageRowKeys,
+            selectedKeys,
             headerChecked,
             onToggleAll: toggleSelectAll,
             onToggleRow: toggleSelectRow,
         };
-    }, [showRowSelection, pageRowIds, selectedRowIndexes, headerChecked, toggleSelectAll, toggleSelectRow]);
+    }, [showRowSelection, pageRowKeys, selectedKeys, headerChecked, toggleSelectAll, toggleSelectRow]);
 
     const gridTheme = resolveJsGridTheme(props.theme);
 
