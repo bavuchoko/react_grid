@@ -56,6 +56,7 @@ export default function Example() {
   - `render`: 셀 커스텀 렌더링(선택)
     - 함수형: `({ row, value, columnKey, rowIndex }) => ReactNode`
     - JSX/ReactNode: element일 경우 내부적으로 `row/value/columnKey/rowIndex` props를 주입하여 렌더링
+  - `editor`: 편집 UI 컴포넌트(선택). **`editable={true}`일 때만** 해당 컬럼 본문 셀 **더블클릭**으로 연다. 함수형·JSX 주입 지원, `onChange`, `onClose` 주입.
 - **`data?: { content?: unknown[]; pageable?: Page; totalElements?: number; totalPages?: number }`**: 페이지 데이터
 
 #### `Header.render` 사용 예시
@@ -87,6 +88,48 @@ const header: Header[] = [
 ];
 ```
 
+#### `Header.editor` — 더블클릭 인라인 편집
+
+`JsGrid`에 **`editable={true}`** 를 넘기고, `editor`가 정의된 컬럼만 본문 셀 **더블클릭** 시 편집 UI가 셀 위치에 열립니다. (`editable`이 없거나 `false`면 `editor`가 있어도 더블클릭 편집은 동작하지 않습니다.)
+
+값 반영은 `onCellChange` 또는 에디터에서 직접 API 호출 후 `data` 갱신으로 처리합니다.
+
+```tsx
+const header: Header[] = [
+  {
+    key: "assetName",
+    label: "자산명",
+    type: "string",
+    editor: ({ value, onChange, onClose }) => (
+      <input
+        autoFocus
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onChange((e.target as HTMLInputElement).value, { close: true });
+          if (e.key === "Escape") onClose();
+        }}
+        style={{ width: "100%", boxSizing: "border-box" }}
+      />
+    ),
+  },
+];
+
+<JsGrid
+  editable={true}
+  header={header}
+  data={pageData}
+  onCellChange={({ row, rowIndex, columnKey, value }) => {
+    // row / API로 갱신 후 setState → data.content 재전달
+    console.log("cell change", rowIndex, columnKey, value, row);
+  }}
+/>
+```
+
+- `onChange(nextValue, { close: true })` — 값 적용 후 팝업 닫기
+- `onClose()` — 적용 없이 닫기(모달·드로어 완료 버튼 등)
+- 인풋·달력·드로어·모달 등 **임의 React 컴포넌트**를 `editor`에 넣을 수 있습니다.
+
 ### 이벤트/액션
 
 - **`onPageChange?: (pageable: Page) => void`**: 페이지/정렬 변경 시 호출 (서버 페이징 연결용)
@@ -94,6 +137,8 @@ const header: Header[] = [
 - **`onHeaderReset?: () => void | Promise<void>`**: 컬럼 설정 메뉴에서 "초기화" 클릭 시 호출. `async`/`Promise` 처리 중에는 저장과 동일하게 툴바·본문 로딩이 표시된다.
 - **`onRowClick?: (row: unknown) => void`**: 체크박스를 제외한 행 클릭 시 호출 (클릭된 행의 데이터 객체 전달)
   - `Header.render`가 있는 셀은 기본적으로 `onRowClick`으로 이벤트가 전파되지 않습니다.
+- **`editable?: boolean`**: `true`일 때만 `Header.editor` 더블클릭 편집 활성 (기본 `false`)
+- **`onCellChange?: (event) => void | Promise<void>`**: `Header.editor`에서 `onChange` 호출 시 전달 (`row`, `rowIndex`, `columnKey`, `value`, `previousValue`)
 - **`enableRowSelection?: boolean`**: `true`면 체크박스 열·행 선택 UI를 표시한다. 삭제·보내기 등은 `toolbarEnd`의 **`ToolbarDataTransfer`**로 처리한다(선택과 콜백을 분리).
   - 선택 키는 기본 **`row.id`**(또는 `rowSelectionIdKey` / `getRowSelectionId`).
   - **조회 데이터·페이지 메타가 바뀌면** 체크가 **전부 해제**된다(검색 조건 변경 후 잘못된 행 삭제 방지).

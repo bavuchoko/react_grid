@@ -148,7 +148,13 @@ const JsGrid =(props:GridType)=> {
             .filter((c) => c.visible)
             .map((c) => {
                 const h = headerByKey.get(c.key);
-                return { key: c.key, label: c.label, type: h?.type, render: h?.render };
+                return {
+                    key: c.key,
+                    label: c.label,
+                    type: h?.type,
+                    render: h?.render,
+                    editor: h?.editor,
+                };
             });
         const rowNum = { key: "__rownum__", label: "#", __rownum__: true as const };
         const cb = { key: "__checkbox__", label: "", __checkbox__: true as const };
@@ -605,6 +611,7 @@ const JsGrid =(props:GridType)=> {
                     >
                         <JsGridTable
                             theme={props.theme}
+                            editable={props.editable}
                             columns={columns}
                             data={data}
                             page={page}
@@ -618,6 +625,7 @@ const JsGrid =(props:GridType)=> {
                             getStickyStyle={getStickyStyle}
                             rowSelection={rowSelection}
                             onRowClick={props.onRowClick}
+                            onCellChange={props.onCellChange}
                             onSortChange={(next) => {
                                 setSortKey(next.key);
                                 setSortDir(next.direction);

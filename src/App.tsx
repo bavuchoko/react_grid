@@ -1,4 +1,4 @@
-import type {Header, HeaderState} from "./app/type/Type.ts";
+import type {GridCellEditorArgs, Header, HeaderState} from "./app/type/Type.ts";
 import JsGrid from "./app/JsGrid.tsx";
 import ToolbarAsyncAction from "./app/js-grid/ToolbarAsyncAction.tsx";
 import ToolbarDataTransfer from "./app/js-grid/ToolbarDataTransfer.tsx";
@@ -30,6 +30,51 @@ const PAGE_SIZE = 15;
 const TOTAL_ELEMENTS = 150;
 const TOTAL_PAGES = 10;
 
+/** `header` 초기 정의 시 `editor`에서 API 저장 함수를 참조한다. */
+const patchAssetNameRef: {
+    current: (row: unknown, assetName: string) => Promise<void>;
+} = { current: async () => {} };
+
+function TextCellEditor({
+    value,
+    row,
+    onClose,
+    onSave,
+}: {
+    value: unknown;
+    row: unknown;
+    onClose: () => void;
+    onSave: (row: unknown, next: string) => Promise<void>;
+}) {
+    const [draft, setDraft] = useState(String(value ?? ""));
+    const [busy, setBusy] = useState(false);
+
+    const commit = async () => {
+        if (busy) return;
+        setBusy(true);
+        try {
+            await onSave(row, draft);
+            onClose();
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <input
+            autoFocus
+            disabled={busy}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+                if (e.key === "Enter") void commit();
+                if (e.key === "Escape") onClose();
+            }}
+            style={{ width: "100%", boxSizing: "border-box", fontSize: 13 }}
+        />
+    );
+}
+
 const App = () => {
     const [pageNumber, setPageNumber] = useState(0);
     const [header, setHeader] = useState<Header[]>(() => [
@@ -55,7 +100,15 @@ const App = () => {
             "key": "assetName",
             "label": "자산명",
             "type": "string",
-            "width": 338
+            "width": 338,
+            editor: (args: GridCellEditorArgs) => (
+                <TextCellEditor
+                    value={args.value}
+                    row={args.row}
+                    onClose={args.onClose}
+                    onSave={(row, name) => patchAssetNameRef.current(row, name)}
+                />
+            ),
         },
         {
             "key": "locationName",
@@ -256,8 +309,7 @@ const App = () => {
     //     }))
     // ));
 
-    const data = {
-        "content": [
+    const [rows, setRows] = useState<unknown[]>(() => [
             {
                 "id": 3944,
                 "assetName": "000시스템",
@@ -2134,8 +2186,8 @@ const App = () => {
                 "auth": null,
                 "removed": false
             }
-        ]
-    }
+    ]);
+
     const headerApi = useCallback(async (_payload: HeaderState[]) => {
         await new Promise<void>((r) => window.setTimeout(r, 300));
         return true as const;
@@ -2183,6 +2235,33 @@ const App = () => {
         console.log("커스텀 사용자 메뉴(테스트) 완료");
     }, [delay]);
 
+    const patchAssetNameApi = useCallback(
+        (id: number, assetName: string) =>
+            new Promise<void>((resolve) => {
+                console.log("patch assetName 요청", { id, assetName });
+                window.setTimeout(() => resolve(), 500);
+            }),
+        [],
+    );
+
+    const patchAssetName = useCallback(
+        async (row: unknown, assetName: string) => {
+            const id = (row as { id?: unknown }).id;
+            if (typeof id !== "number" || !Number.isFinite(id)) return;
+
+            await patchAssetNameApi(id, assetName);
+            setRows((prev) =>
+                prev.map((r) =>
+                    (r as { id?: unknown }).id === id
+                        ? { ...(r as Record<string, unknown>), assetName }
+                        : r,
+                ),
+            );
+        },
+        [patchAssetNameApi],
+    );
+    patchAssetNameRef.current = patchAssetName;
+
     // api 요청 테스트용 삭제 메서드
     const deleteApi = useCallback((ids: number[]) =>
         new Promise<void>((resolve) => {
@@ -2209,15 +2288,15 @@ const App = () => {
         setPageNumber(p.pageNumber ?? 0);
     }, []);
 
-    const pageData = useMemo(() => {
-        const rows = Array.isArray(data) ? data : (data as { content?: unknown[] }).content ?? [];
-        return {
+    const pageData = useMemo(
+        () => ({
             content: rows,
             pageable: {pageNumber, pageSize: PAGE_SIZE, size: PAGE_SIZE},
             totalElements: TOTAL_ELEMENTS,
             totalPages: TOTAL_PAGES,
-        };
-    }, [data, pageNumber]);
+        }),
+        [rows, pageNumber],
+    );
 
     const isAdmin = true
 
@@ -2225,6 +2304,7 @@ const App = () => {
     return (
         <div style={{height:'700px', width:'1400px', paddingLeft:'10px'}}>
             <JsGrid
+                editable={true}
                 resizable={true}
                 theme={'linear'}
 

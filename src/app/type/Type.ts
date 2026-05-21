@@ -31,10 +31,20 @@ export type GridType ={
      * - `sort`는 `property,direction` 형태(예: `createdAt,desc`)를 권장
      */
     onPageChange?: (pageable: Page) => void
+    /**
+     * 본문 셀 편집기(`Header.editor`)에서 `onChange`가 호출될 때 전달된다.
+     * 행 데이터 갱신은 호출 측(부모 state / API)에서 처리한다.
+     */
+    onCellChange?: (event: GridCellChangeEvent) => void | Promise<void>
     /** 생략·`basic`은 기본 스타일. `linear`는 툴바·헤더 흰 배경, 본문 홀수 행(1·3·5…) 줄무늬. */
     theme?: JsGridTheme
     /** `true`일 때만 헤더에서 열 너비 드래그·리사이즈 핸들(`|`)이 표시·동작한다. */
     resizable?: boolean
+    /**
+     * `true`일 때만 `Header.editor`가 있는 본문 셀을 더블클릭해 편집 UI를 연다.
+     * (기본값: `false`)
+     */
+    editable?: boolean
     /** 툴바 왼쪽(헤더 고정 안내 옆). 함수면 `runToolbarAction`으로 본문 로딩 연동 가능. */
     toolbarStart?: JsGridToolbarSlot
     /** 툴바 오른쪽 기본 아이콘 앞. 함수면 `runToolbarAction`으로 본문 로딩 연동 가능. */
@@ -67,6 +77,24 @@ export type GridCellRenderArgs = {
     stopRowClick: (e: unknown) => void;
 };
 
+/** `Header.editor` — `render` 인자 + 값 적용/닫기 콜백 */
+export type GridCellEditorArgs = GridCellRenderArgs & {
+    /** 새 값 적용. `close: true`면 팝업을 닫는다. */
+    onChange: (value: unknown, options?: { close?: boolean }) => void;
+    /** 편집 UI 닫기(모달·드로어 완료 시 등) */
+    onClose: () => void;
+};
+
+export type GridCellEditor = ReactNode | ((args: GridCellEditorArgs) => ReactNode);
+
+export type GridCellChangeEvent = {
+    row: unknown;
+    rowIndex: number;
+    columnKey: string;
+    value: unknown;
+    previousValue: unknown;
+};
+
 export type DataType = 'string' | 'number' | 'state' | 'date' | 'score' | 'children';
 
 /** `JsGridTable` 컬럼 배열(행번호·체크박스 열 포함). `Header`와 동일한 `GridCellRenderArgs`를 사용한다. */
@@ -76,6 +104,7 @@ export type JsGridTableColumn = {
     /** `Header.type` — `children`이면 `key`를 `_` 기준으로 나눠 배열에서 `valueString`을 찾는다. */
     type?: DataType;
     render?: ReactNode | ((args: GridCellRenderArgs) => ReactNode);
+    editor?: GridCellEditor;
     __rownum__?: boolean;
     __checkbox__?: boolean;
 };
@@ -105,6 +134,12 @@ export type Header ={
      * - JSX/ReactNode면 element일 경우 `row`, `value`, `columnKey` props를 주입하여 렌더링한다.
      */
     render?: ReactNode | ((args: GridCellRenderArgs) => ReactNode);
+    /**
+     * 본문 셀 **더블클릭** 시 표시할 편집 UI.
+     * - 함수형: `(args) => ReactNode`
+     * - JSX/ReactNode: `row`, `value`, `columnKey`, `rowIndex`, `onChange`, `onClose` props 주입
+     */
+    editor?: GridCellEditor;
 }
 
 export type IconType ={

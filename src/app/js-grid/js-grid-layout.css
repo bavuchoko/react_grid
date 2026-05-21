@@ -65,3 +65,21 @@
     pointer-events: none;
     user-select: none;
 }
+
+.js-grid-cell-editable .js-grid-cell-inner {
+    cursor: text;
+}
+
+.js-grid-cell-editor-popover-inner input,
+.js-grid-cell-editor-popover-inner select,
+.js-grid-cell-editor-popover-inner textarea {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    border: none;
+    outline: none;
+    background: transparent;
+    font: inherit;
+    padding: 0;
+    margin: 0;
+}
