@@ -1,7 +1,6 @@
 import type {Header, HeaderState} from "./app/type/Type.ts";
 import JsGrid from "./app/JsGrid.tsx";
 import ToolbarAsyncAction from "./app/js-grid/ToolbarAsyncAction.tsx";
-import ToolbarUploadAction from "./app/js-grid/ToolbarUploadAction.tsx";
 import DownLoad from "./app/resources/icon/DownLoad.tsx";
 import {useCallback, useMemo, useState} from "react";
 import {applyHeaderStateToHeader} from "./app/index.ts";
@@ -2153,13 +2152,8 @@ const App = () => {
         [],
     );
 
-    const onUploadConfirm = useCallback(async (files: File[]) => {
-        await delay(1500);
-        console.log(
-            "업로드 완료 샘플",
-            files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
-        );
-    }, [delay]);
+
+
     const onHeaderReset = useCallback(async () => {
         await headerApi([]);
     }, [headerApi]);
@@ -2264,12 +2258,6 @@ const App = () => {
                     <div style={demoToolbarCustomGap}>
                         {isAdmin ? (
                             <>
-                                <ToolbarUploadAction
-                                    hint="업로드 (테스트)"
-                                    busyHint="업로드 중…"
-                                    overlayLabel="업로드 중…"
-                                    onUploadConfirm={onUploadConfirm}
-                                />
                                 <ToolbarAsyncAction
                                     hint="다운로드 (테스트)"
                                     busyHint="다운로드 중…"
