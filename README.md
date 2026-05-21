@@ -121,14 +121,86 @@ const header: Header[] = [
 
 ### 툴바 커스텀 아이콘 / UI
 
-그리드 기본 툴바(추가·다운로드·업로드·삭제·컬럼·전체화면 등) 외에 **사용자 정의 버튼·아이콘·컴포넌트**를 넣을 수 있습니다. `ReactNode`이므로 버튼, SVG 아이콘, `@bavuchoko/js-tooltip`의 `ToolbarHint` 조합 등 자유롭게 구성하면 됩니다.
+그리드 기본 툴바(추가·다운로드·업로드·삭제·컬럼·전체화면 등) 외에 **사용자 정의 버튼·아이콘**을 넣을 수 있습니다.
 
-| Prop | 위치 |
-|------|------|
-| **`toolbarStart`** | 툴바 **왼쪽** — 「헤더 고정」 안내(자물쇠) **오른쪽** |
-| **`toolbarEnd`** | 툴바 **오른쪽** — 기본 액션 아이콘들 **앞**(추가·다운로드·업로드·삭제·컬럼 메뉴·전체화면 **앞**) |
+| Prop | 타입 | 위치 |
+|------|------|------|
+| **`toolbarStart`** | `ReactNode` \| `(api) => ReactNode` | 툴바 **왼쪽** — 「헤더 고정」 안내(자물쇠) **오른쪽** |
+| **`toolbarEnd`** | `ReactNode` \| `(api) => ReactNode` | 툴바 **오른쪽** — 기본 액션 아이콘들 **앞** |
 
 아이콘 크기는 기본 툴바와 맞추려면 **약 18×18px**을 권장합니다.
+
+#### `ToolbarAsyncAction`으로 감싸서 넣기 (권장)
+
+API 호출 등 **`Promise`가 끝날 때까지** 다운로드·업로드와 같은 로딩(아이콘 스피너, 필요 시 본문 블러)을 쓰려면, **커스텀 아이콘을 `ToolbarAsyncAction`으로 감싼 뒤** `toolbarStart` / `toolbarEnd`에 넣으면 됩니다.
+
+```tsx
+import JsGrid, { ToolbarAsyncAction } from "@bavuchoko/js-grid";
+
+<JsGrid
+  header={header}
+  data={data}
+  toolbarEnd={() => (
+    <ToolbarAsyncAction
+      hint="새로고침"
+      busyHint="새로고침 중…"
+      overlayLabel="새로고침 중…"
+      onClick={async () => {
+        await refreshList();
+      }}
+    >
+      <RefreshIcon />
+    </ToolbarAsyncAction>
+  )}
+/>
+```
+
+| `ToolbarAsyncAction` prop | 설명 |
+|-------------------------|------|
+| **`onClick`** | 클릭 시 실행. **`async` + `await`** 로 API가 끝날 때까지 스피너 유지 |
+| **`hint`** | 평소 툴팁 (`@bavuchoko/js-tooltip`) |
+| **`busyHint`** | 로딩 중 툴팁 (생략 시 `hint` 유지) |
+| **`overlayLabel`** | 지정 시 본문(테이블·페이지네이션) 블러 + 가운데 문구. **생략 시 아이콘 스피너만** |
+| **`accentColor`** | 스피너 색 (기본 `#2563eb`) |
+| **`disabled`** | 비활성 |
+| **children** | 아이콘·SVG 등 (18×18px 권장) |
+
+- `onClick`이 **동기만** 실행되면 스피너가 거의 보이지 않을 수 있습니다.
+- `overlayLabel` + 본문 블러를 쓰려면 `toolbarStart` / `toolbarEnd`를 **함수형** `() => (...)` 으로 넘기는 것을 권장합니다.
+
+#### 아이콘 여러 개
+
+개수 제한 없이, Fragment(`<>...</>`) 또는 `div`로 나열합니다.
+
+```tsx
+<JsGrid
+  toolbarStart={() => (
+    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <ToolbarAsyncAction hint="검색" overlayLabel="검색 중…" onClick={onSearch}>
+        <SearchIcon />
+      </ToolbarAsyncAction>
+      <ToolbarAsyncAction hint="새로고침" overlayLabel="새로고침 중…" onClick={onRefresh}>
+        <RefreshIcon />
+      </ToolbarAsyncAction>
+    </div>
+  )}
+  toolbarEnd={() => (
+    <>
+      <ToolbarAsyncAction hint="필터" onClick={onFilter}>
+        <FilterIcon />
+      </ToolbarAsyncAction>
+      <ToolbarAsyncAction hint="사용자" overlayLabel="불러오는 중…" onClick={onUser}>
+        <UserIcon />
+      </ToolbarAsyncAction>
+    </>
+  )}
+/>
+```
+
+- 왼쪽·오른쪽에 나눠 넣으려면 `toolbarStart` / `toolbarEnd`를 각각 사용합니다.
+- 동시에 여러 API를 돌리지 않도록, 필요하면 앱에서 클릭 가드·`disabled`를 추가하세요.
+
+#### 로딩 없이 버튼만 넣기
 
 **왼쪽에 필터 버튼**
 
@@ -144,87 +216,32 @@ const header: Header[] = [
 />
 ```
 
-**오른쪽에 사용자 아이콘(클릭 핸들러)**
-
-```tsx
-import { ToolbarHint } from "@bavuchoko/js-tooltip";
-
-function UserIcon(props: { onClick?: () => void }) {
-  return (
-    <svg
-      width={18}
-      height={18}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      onClick={props.onClick}
-      style={{ cursor: "pointer" }}
-      aria-hidden
-    >
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
-<JsGrid
-  header={header}
-  data={data}
-  toolbarEnd={
-    <ToolbarHint text="사용자 메뉴">
-      <UserIcon onClick={() => openUserMenu()} />
-    </ToolbarHint>
-  }
-/>
-```
-
-**양쪽 동시 사용**
-
-```tsx
-<JsGrid
-  header={header}
-  data={data}
-  toolbarStart={<MyFilterButton />}
-  toolbarEnd={<MyUserMenuIcon />}
-/>
-```
-
 커스텀 영역은 클래스 `js-grid-toolbar-custom`, `js-grid-toolbar-custom-start`, `js-grid-toolbar-custom-end`로 감싸져 있어 필요 시 CSS로 간격·정렬을 조정할 수 있습니다.
 
-#### Promise 로딩 (아이콘 스피너 + 본문 블러)
+#### 본문 블러만 직접 제어 (`runToolbarAction`)
 
-다운로드·업로드와 같이 **`Promise`가 끝날 때까지** 로딩을 보여 주려면 패키지에서 제공하는 **`ToolbarAsyncAction`**을 사용합니다.
-
-- **아이콘 위**: 기본 툴바와 동일한 파란 스피너
-- **본문**: `overlayLabel`을 넘기면 테이블·페이지네이션 블러 + 「…」 오버레이 (내장 액션과 동일)
-
-`toolbarStart` / `toolbarEnd`는 **함수형(render prop)**으로 넘기면 `runToolbarAction`으로 본문 오버레이만 직접 제어할 수도 있습니다.
+아이콘 UI는 직접 만들고, 테이블 블러·오버레이만 그리드에 맡길 때:
 
 ```tsx
-import JsGrid, { ToolbarAsyncAction } from "@bavuchoko/js-grid";
+import type { JsGridToolbarApi } from "@bavuchoko/js-grid";
 
 <JsGrid
-  header={header}
-  data={data}
-  toolbarEnd={() => (
-    <ToolbarAsyncAction
-      hint="사용자 메뉴"
-      busyHint="불러오는 중…"
-      overlayLabel="불러오는 중…"
-      onClick={async () => {
-        await fetchUserMenu();
-      }}
+  toolbarEnd={(api: JsGridToolbarApi) => (
+    <button
+      type="button"
+      onClick={() =>
+        void api.runToolbarAction("처리 중…", async () => {
+          await myApi();
+        })
+      }
     >
-      <UserIcon />
-    </ToolbarAsyncAction>
+      실행
+    </button>
   )}
 />
 ```
 
-- `onClick`이 **동기**만 수행하면 스피너가 거의 보이지 않을 수 있습니다. API 호출은 `async` 함수로 `await`하세요.
-- `overlayLabel`을 생략하면 **아이콘 스피너만** 표시되고 본문 블러는 없습니다.
-- `ToolbarAsyncAction` 없이 직접 구현할 때: `toolbarStart={(api) => ...}` 안에서 `await api.runToolbarAction("처리 중…", () => myApi())` 호출.
+패키지 export: `JsGrid`, `ToolbarAsyncAction`, `useJsGridToolbar`, `JsGridToolbarApi`, `JsGridToolbarSlot`
 
 ## UI 기능
 
