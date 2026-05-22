@@ -23,6 +23,8 @@ import {gridThemeCellBorders, gridThemeStyles, resolveJsGridTheme, type JsGridTh
 export type {JsGridTableColumn} from "../type/Type.ts";
 
 const SORT_ICON_PX = GRID_SORT_ICON_SLOT_PX;
+/** 더블클릭 시 선행 `click` 두 번이 `onRowClick`으로 올라가지 않도록 지연 */
+const ROW_CLICK_DELAY_MS = 250;
 
 function colWidthCss(wPx: number | null | undefined): CSSProperties {
     if (wPx == null || wPx <= 0) return {};
@@ -287,6 +289,29 @@ export default function JsGridTable(props: Props) {
         [editingEnabled, props.columns],
     );
 
+    const pendingRowClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const cancelPendingRowClick = useCallback(() => {
+        if (pendingRowClickTimerRef.current != null) {
+            clearTimeout(pendingRowClickTimerRef.current);
+            pendingRowClickTimerRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => () => cancelPendingRowClick(), [cancelPendingRowClick]);
+
+    const scheduleRowClick = useCallback(
+        (row: unknown) => {
+            if (!props.onRowClick) return;
+            cancelPendingRowClick();
+            pendingRowClickTimerRef.current = setTimeout(() => {
+                pendingRowClickTimerRef.current = null;
+                props.onRowClick?.(row);
+            }, ROW_CLICK_DELAY_MS);
+        },
+        [props.onRowClick, cancelPendingRowClick],
+    );
+
     return (
         <div className="js-grid-table-scroll">
             <table
@@ -514,7 +539,8 @@ export default function JsGridTable(props: Props) {
                                     ? `${rowClass}${rowStripeClass} js-grid-row-idx-${rdex} js-grid-row-id-${rowId}`
                                     : `${rowClass}${rowStripeClass} js-grid-row-idx-${rdex}`
                             }
-                            onClick={() => props.onRowClick?.(row)}
+                            onClick={() => scheduleRowClick(row)}
+                            onDoubleClick={cancelPendingRowClick}
                             style={{
                                 cursor: props.onRowClick ? 'pointer' : undefined,
                                 ...(isLinear && themeStyles.bodyRowStripeBg && rdex % 2 === 0
@@ -583,6 +609,7 @@ export default function JsGridTable(props: Props) {
                                 const onTdDoubleClick = (
                                     e: React.MouseEvent<HTMLTableCellElement>,
                                 ) => {
+                                    cancelPendingRowClick();
                                     if (!hasEditor) return;
                                     e.preventDefault();
                                     e.stopPropagation();
