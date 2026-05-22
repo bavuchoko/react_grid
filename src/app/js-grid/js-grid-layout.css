@@ -70,9 +70,21 @@
     cursor: text;
 }
 
-.js-grid-cell-editor-popover-inner input,
-.js-grid-cell-editor-popover-inner select,
-.js-grid-cell-editor-popover-inner textarea {
+.js-grid-cell-editing {
+    outline: 1px solid #2563eb;
+    outline-offset: -1px;
+    z-index: 2;
+}
+
+.js-grid-cell-inner--editing {
+    overflow: visible;
+    width: 100%;
+    height: 100%;
+}
+
+.js-grid-cell-inner--editing input,
+.js-grid-cell-inner--editing select,
+.js-grid-cell-inner--editing textarea {
     width: 100%;
     min-width: 0;
     box-sizing: border-box;

@@ -450,6 +450,11 @@ const JsGrid =(props:GridType)=> {
     }, [toolbarOverlay, fieldsSaveBusy, fieldsResetBusy]);
     const gridBodyBusy = gridBodyOverlay != null;
 
+    /** 전체보기 + `editable`일 때만 더블클릭 편집. 일반 화면은 `onRowClick` 유지 */
+    const pseudoFullscreenEditMode =
+        isPseudoFullscreen && props.editable === true;
+    const tableOnRowClick = isPseudoFullscreen ? undefined : props.onRowClick;
+
     return (
         <JsGridToolbarProvider value={toolbarApi}>
             <JsGridRowSelectionProvider value={rowSelectionApi}>
@@ -611,7 +616,7 @@ const JsGrid =(props:GridType)=> {
                     >
                         <JsGridTable
                             theme={props.theme}
-                            editable={props.editable}
+                            editable={pseudoFullscreenEditMode}
                             columns={columns}
                             data={data}
                             page={page}
@@ -624,7 +629,7 @@ const JsGrid =(props:GridType)=> {
                             onFreezeColumn={handleFreezeColumn}
                             getStickyStyle={getStickyStyle}
                             rowSelection={rowSelection}
-                            onRowClick={props.onRowClick}
+                            onRowClick={tableOnRowClick}
                             onCellChange={props.onCellChange}
                             onSortChange={(next) => {
                                 setSortKey(next.key);

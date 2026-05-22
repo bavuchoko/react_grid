@@ -41,7 +41,8 @@ export type GridType ={
     /** `true`일 때만 헤더에서 열 너비 드래그·리사이즈 핸들(`|`)이 표시·동작한다. */
     resizable?: boolean
     /**
-     * `true`일 때만 `Header.editor`가 있는 본문 셀을 더블클릭해 편집 UI를 연다.
+     * `true`이고 전체보기(pseudo fullscreen)일 때만 `Header.editor` 셀을 **클릭**해 편집한다.
+     * 일반 화면에서는 `onRowClick`만 사용한다. 전체보기 중에는 `onRowClick`이 호출되지 않는다.
      * (기본값: `false`)
      */
     editable?: boolean

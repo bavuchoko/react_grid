@@ -15,7 +15,12 @@ import {computeRowNumber} from "./rowNumber.ts";
 import type {CSSProperties, MutableRefObject, ReactNode} from "react";
 import React, {isValidElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 import type {GridCellChangeEvent, JsGridTableColumn, Page} from "../type/Type.ts";
-import CellEditorPopover, {type CellEditorSession} from "./CellEditorPopover.tsx";
+import {renderGridCellEditor} from "./renderGridCellEditor.tsx";
+
+type CellEditorSession = {
+    rowIndex: number;
+    columnKey: string;
+};
 import ASC from "../resources/icon/ASC.tsx";
 import DESC from "../resources/icon/DESC.tsx";
 import {gridThemeCellBorders, gridThemeStyles, resolveJsGridTheme, type JsGridTheme} from "./gridTheme.ts";
@@ -23,8 +28,6 @@ import {gridThemeCellBorders, gridThemeStyles, resolveJsGridTheme, type JsGridTh
 export type {JsGridTableColumn} from "../type/Type.ts";
 
 const SORT_ICON_PX = GRID_SORT_ICON_SLOT_PX;
-/** 더블클릭 시 선행 `click` 두 번이 `onRowClick`으로 올라가지 않도록 지연 */
-const ROW_CLICK_DELAY_MS = 250;
 
 function colWidthCss(wPx: number | null | undefined): CSSProperties {
     if (wPx == null || wPx <= 0) return {};
@@ -194,7 +197,7 @@ type Props = {
     onCellChange?: (event: GridCellChangeEvent) => void | Promise<void>;
     onColumnWidthChange?: (columnKey: string, widthPx: number) => void;
     theme?: JsGridTheme | string;
-    /** `true`일 때만 `Header.editor` 더블클릭 편집 활성 */
+    /** `true`일 때만 `Header.editor` 셀 클릭으로 편집(전체보기 모드) */
     editable?: boolean;
 };
 
@@ -236,28 +239,31 @@ export default function JsGridTable(props: Props) {
         if (!editingEnabled) setEditorSession(null);
     }, [editingEnabled]);
 
-    const editorColumn = useMemo(() => {
-        if (!editorSession) return null;
-        return props.columns.find((c) => c.key === editorSession.columnKey) ?? null;
-    }, [editorSession, props.columns]);
-
-    const editorRow = editorSession != null ? props.data[editorSession.rowIndex] : undefined;
-    const editorValue =
-        editorSession && editorColumn
-            ? resolveBodyCellValue(
-                  editorRow,
-                  editorColumn,
-                  editorSession.rowIndex,
-                  props.page,
-                  props.data.length,
-              )
-            : undefined;
-
     const closeEditor = useCallback(() => setEditorSession(null), []);
+
+    useEffect(() => {
+        if (!editorSession) return;
+        const onDown = (e: MouseEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest(".js-grid-cell-editing")) return;
+            closeEditor();
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") closeEditor();
+        };
+        window.addEventListener("mousedown", onDown);
+        window.addEventListener("keydown", onKey);
+        return () => {
+            window.removeEventListener("mousedown", onDown);
+            window.removeEventListener("keydown", onKey);
+        };
+    }, [editorSession, closeEditor]);
 
     const handleEditorChange = useCallback(
         (nextValue: unknown, options?: { close?: boolean }) => {
-            if (!editorSession || !editorColumn) return;
+            if (!editorSession) return;
+            const editorColumn = props.columns.find((c) => c.key === editorSession.columnKey);
+            if (!editorColumn) return;
             const row = props.data[editorSession.rowIndex];
             if (row === undefined) return;
             const previousValue = resolveBodyCellValue(
@@ -276,40 +282,17 @@ export default function JsGridTable(props: Props) {
             });
             if (options?.close) closeEditor();
         },
-        [editorSession, editorColumn, props, closeEditor],
+        [editorSession, props.columns, props.data, props.page, props.onCellChange, closeEditor],
     );
 
     const openCellEditor = useCallback(
-        (args: { rowIndex: number; columnKey: string; anchorRect: DOMRect }) => {
+        (args: { rowIndex: number; columnKey: string }) => {
             if (!editingEnabled) return;
             const col = props.columns.find((c) => c.key === args.columnKey);
             if (!col?.editor) return;
             setEditorSession(args);
         },
         [editingEnabled, props.columns],
-    );
-
-    const pendingRowClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const cancelPendingRowClick = useCallback(() => {
-        if (pendingRowClickTimerRef.current != null) {
-            clearTimeout(pendingRowClickTimerRef.current);
-            pendingRowClickTimerRef.current = null;
-        }
-    }, []);
-
-    useEffect(() => () => cancelPendingRowClick(), [cancelPendingRowClick]);
-
-    const scheduleRowClick = useCallback(
-        (row: unknown) => {
-            if (!props.onRowClick) return;
-            cancelPendingRowClick();
-            pendingRowClickTimerRef.current = setTimeout(() => {
-                pendingRowClickTimerRef.current = null;
-                props.onRowClick?.(row);
-            }, ROW_CLICK_DELAY_MS);
-        },
-        [props.onRowClick, cancelPendingRowClick],
     );
 
     return (
@@ -539,8 +522,11 @@ export default function JsGridTable(props: Props) {
                                     ? `${rowClass}${rowStripeClass} js-grid-row-idx-${rdex} js-grid-row-id-${rowId}`
                                     : `${rowClass}${rowStripeClass} js-grid-row-idx-${rdex}`
                             }
-                            onClick={() => scheduleRowClick(row)}
-                            onDoubleClick={cancelPendingRowClick}
+                            onClick={
+                                props.onRowClick
+                                    ? () => props.onRowClick?.(row)
+                                    : undefined
+                            }
                             style={{
                                 cursor: props.onRowClick ? 'pointer' : undefined,
                                 ...(isLinear && themeStyles.bodyRowStripeBg && rdex % 2 === 0
@@ -606,20 +592,6 @@ export default function JsGridTable(props: Props) {
                                     ...props.getStickyStyle({ colIndex: cdex, isHeader: false }),
                                 };
 
-                                const onTdDoubleClick = (
-                                    e: React.MouseEvent<HTMLTableCellElement>,
-                                ) => {
-                                    cancelPendingRowClick();
-                                    if (!hasEditor) return;
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openCellEditor({
-                                        rowIndex: rdex,
-                                        columnKey: column.key,
-                                        anchorRect: e.currentTarget.getBoundingClientRect(),
-                                    });
-                                };
-
                                 const onTdClick = (e: React.MouseEvent<HTMLTableCellElement>) => {
                                     if (isCheckbox) {
                                         e.stopPropagation();
@@ -629,12 +601,25 @@ export default function JsGridTable(props: Props) {
                                         );
                                         return;
                                     }
+                                    if (hasEditor && editingEnabled) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        openCellEditor({
+                                            rowIndex: rdex,
+                                            columnKey: column.key,
+                                        });
+                                        return;
+                                    }
                                     if (column.render) {
                                         e.stopPropagation();
                                     }
                                 };
 
                                 const cellText = rendered ?? formatCellDisplayValue(value);
+                                const isEditing =
+                                    editorSession?.rowIndex === rdex
+                                    && editorSession?.columnKey === column.key
+                                    && hasEditor;
 
                                 const tdChildren = isCheckbox && props.rowSelection ? (
                                     <input
@@ -646,16 +631,29 @@ export default function JsGridTable(props: Props) {
                                         readOnly
                                         style={{ pointerEvents: 'none' }}
                                     />
+                                ) : isEditing && column.editor ? (
+                                    <div className="js-grid-cell-inner js-grid-cell-inner--editing">
+                                        {renderGridCellEditor(column.editor, {
+                                            row,
+                                            value,
+                                            columnKey: column.key,
+                                            rowIndex: rdex,
+                                            onChange: handleEditorChange,
+                                            onClose: closeEditor,
+                                            stopRowClick,
+                                        })}
+                                    </div>
                                 ) : (
                                     <div className="js-grid-cell-inner">{cellText}</div>
                                 );
+
+                                const editingClass = isEditing ? " js-grid-cell-editing" : "";
 
                                 return isCheckbox || isRowNum ? (
                                     <td
                                         key={colKey}
                                         className={`${bodyCellBorderClass} ${gridColClassNames(cdex, column, "td")}`}
                                         onClick={onTdClick}
-                                        onDoubleClick={onTdDoubleClick}
                                         style={tdStyle}
                                     >
                                         {tdChildren}
@@ -663,14 +661,14 @@ export default function JsGridTable(props: Props) {
                                 ) : (
                                     <TruncatingTd
                                         key={colKey}
-                                        className={`${bodyCellBorderClass} ${gridColClassNames(cdex, column, "td")}${hasEditor ? " js-grid-cell-editable" : ""}`}
+                                        className={`${bodyCellBorderClass} ${gridColClassNames(cdex, column, "td")}${hasEditor ? " js-grid-cell-editable" : ""}${editingClass}`}
                                         onClick={onTdClick}
-                                        onDoubleClick={onTdDoubleClick}
                                         style={tdStyle}
                                         skipResizeObserve={
-                                            freezeActive &&
-                                            props.freezeUntilIndex != null &&
-                                            cdex <= props.freezeUntilIndex
+                                            isEditing
+                                            || (freezeActive
+                                                && props.freezeUntilIndex != null
+                                                && cdex <= props.freezeUntilIndex)
                                         }
                                     >
                                         {tdChildren}
@@ -682,16 +680,6 @@ export default function JsGridTable(props: Props) {
                     })}
                 </tbody>
             </table>
-            {editorSession && editorColumn && editorRow !== undefined ? (
-                <CellEditorPopover
-                    session={editorSession}
-                    row={editorRow}
-                    column={editorColumn}
-                    value={editorValue}
-                    onChange={handleEditorChange}
-                    onClose={closeEditor}
-                />
-            ) : null}
         </div>
     );
 }
