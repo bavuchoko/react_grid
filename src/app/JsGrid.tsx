@@ -450,7 +450,7 @@ const JsGrid =(props:GridType)=> {
     }, [toolbarOverlay, fieldsSaveBusy, fieldsResetBusy]);
     const gridBodyBusy = gridBodyOverlay != null;
 
-    /** 전체보기 + `editable`일 때만 더블클릭 편집. 일반 화면은 `onRowClick` 유지 */
+    /** 전체보기 + `editable`: 셀 선택·재클릭 편집·세로 드래그·붙여넣기 */
     const pseudoFullscreenEditMode =
         isPseudoFullscreen && props.editable === true;
     const tableOnRowClick = isPseudoFullscreen ? undefined : props.onRowClick;
@@ -631,6 +631,8 @@ const JsGrid =(props:GridType)=> {
                             rowSelection={rowSelection}
                             onRowClick={tableOnRowClick}
                             onCellChange={props.onCellChange}
+                            onCellsPaste={props.onCellsPaste}
+                            rowIdKey={props.rowIdKey}
                             onSortChange={(next) => {
                                 setSortKey(next.key);
                                 setSortDir(next.direction);

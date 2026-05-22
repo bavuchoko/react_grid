@@ -1,10 +1,10 @@
-import type {GridCellEditorArgs, Header, HeaderState} from "./app/type/Type.ts";
+import type {GridCellEditorArgs, GridCellPasteBatch, Header, HeaderState} from "./app/type/Type.ts";
 import JsGrid from "./app/JsGrid.tsx";
 import ToolbarAsyncAction from "./app/js-grid/ToolbarAsyncAction.tsx";
 import ToolbarDataTransfer from "./app/js-grid/ToolbarDataTransfer.tsx";
 import DownLoad from "./app/resources/icon/DownLoad.tsx";
 import {useCallback, useMemo, useState} from "react";
-import {applyHeaderStateToHeader} from "./app/index.ts";
+import {applyHeaderStateToHeader, applyPasteValueToRow} from "./app/index.ts";
 
 function DemoToolbarIcon({ children }: { children: React.ReactNode }) {
     return (
@@ -2235,11 +2235,16 @@ const App = () => {
         console.log("커스텀 사용자 메뉴(테스트) 완료");
     }, [delay]);
 
-    const patchAssetNameApi = useCallback(
-        (id: number, assetName: string) =>
+    const headerTypeByKey = useMemo(
+        () => new Map(header.map((h) => [h.key, h.type] as const)),
+        [header],
+    );
+
+    const patchCellsApi = useCallback(
+        (columnKey: string, value: string, ids: number[]) =>
             new Promise<void>((resolve) => {
-                console.log("patch assetName 요청", { id, assetName });
-                window.setTimeout(() => resolve(), 500);
+                console.log("patch cells 요청", { columnKey, value, ids });
+                window.setTimeout(() => resolve(), 100);
             }),
         [],
     );
@@ -2249,16 +2254,17 @@ const App = () => {
             const id = (row as { id?: unknown }).id;
             if (typeof id !== "number" || !Number.isFinite(id)) return;
 
-            await patchAssetNameApi(id, assetName);
+            await patchCellsApi("assetName", assetName, [id]);
             setRows((prev) =>
-                prev.map((r) =>
-                    (r as { id?: unknown }).id === id
-                        ? { ...(r as Record<string, unknown>), assetName }
-                        : r,
-                ),
+                prev.map((r) => {
+                    if ((r as { id?: unknown }).id !== id) return r;
+                    const next = { ...(r as Record<string, unknown>) };
+                    applyPasteValueToRow(next, "assetName", assetName, "string");
+                    return next;
+                }),
             );
         },
-        [patchAssetNameApi],
+        [patchCellsApi],
     );
     patchAssetNameRef.current = patchAssetName;
 
@@ -2281,6 +2287,43 @@ const App = () => {
         console.log("삭제 완료, 이후 재조회 필요", ids);
     }, [deleteApi]);
 
+
+    const onCellsPaste = useCallback(async (batches: GridCellPasteBatch[]) => {
+        if (batches.length === 0) return;
+
+        const patchesByRowId = new Map<number, GridCellPasteBatch["items"]>();
+        for (const batch of batches) {
+            const ids = batch.rowIds.filter(
+                (id): id is number => typeof id === "number" && Number.isFinite(id),
+            );
+            if (ids.length > 0) {
+                await patchCellsApi(batch.columnKey, String(batch.value ?? ""), ids);
+            }
+            for (const item of batch.items) {
+                const id = item.rowId;
+                if (typeof id !== "number" || !Number.isFinite(id)) continue;
+                const list = patchesByRowId.get(id) ?? [];
+                list.push(item);
+                patchesByRowId.set(id, list);
+            }
+        }
+
+        setRows((prev) =>
+            prev.map((r) => {
+                const id = (r as { id?: unknown }).id;
+                if (typeof id !== "number" || !Number.isFinite(id)) return r;
+                const rowItems = patchesByRowId.get(id);
+                if (!rowItems?.length) return r;
+
+                const next = { ...(r as Record<string, unknown>) };
+                for (const item of rowItems) {
+                    const columnType = headerTypeByKey.get(item.columnKey);
+                    applyPasteValueToRow(next, item.columnKey, item.value, columnType);
+                }
+                return next;
+            }),
+        );
+    }, [headerTypeByKey, patchCellsApi]);
 
     const onRowClick = useCallback((rows: unknown) => console.log("rowClick", rows), []);
     const onPageChange = useCallback((p: any) => {
@@ -2389,6 +2432,7 @@ const App = () => {
                 onHeaderReset={onHeaderReset}
                 enableRowSelection={isAdmin}
                 onRowClick={onRowClick}
+                onCellsPaste={onCellsPaste}
                 onPageChange={onPageChange}
             />
         </div>

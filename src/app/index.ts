@@ -1,6 +1,8 @@
 export type {
     GridType,
     GridCellChangeEvent,
+    GridCellPasteItem,
+    GridCellPasteBatch,
     GridCellEditor,
     GridCellEditorArgs,
     GridCellRenderArgs,
@@ -27,5 +29,7 @@ export { DEFAULT_EXCEL_UPLOAD_ACCEPT } from "./js-grid/excelUploadConstraints.ts
 
 export { applyHeaderStateToHeader } from "./utils/applyHeaderState.ts";
 export {
+    applyPasteValueToRow,
     resolveChildrenCellValue,
 } from "./hook/CommonMethod.ts";
+export { groupPasteItemsIntoBatches } from "./js-grid/gridCellSelection.ts";

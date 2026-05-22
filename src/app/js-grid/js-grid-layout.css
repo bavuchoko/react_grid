@@ -66,8 +66,21 @@
     user-select: none;
 }
 
+.js-grid-cell-selectable .js-grid-cell-inner {
+    cursor: cell;
+}
+
 .js-grid-cell-editable .js-grid-cell-inner {
-    cursor: text;
+    cursor: cell;
+}
+
+.js-grid-cell-selected {
+    background-color: #dbeafe !important;
+}
+
+.js-grid-cell-selected .js-grid-cell-inner {
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 .js-grid-cell-editing {

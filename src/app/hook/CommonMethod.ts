@@ -39,6 +39,66 @@ function childrenItemDisplayValue(el: Record<string, unknown>): unknown {
  * `columnKey`는 첫 번째 `_` 앞을 `getValue` 경로(`.` 중첩 가능), 뒤를 `keyString`과 비교할 토큰으로 쓴다.
  * 예: `assetCustomStrings_7` → `row.assetCustomStrings` 배열에서 `keyString === 7`인 항목의 `valueString`.
  */
+function setValueAtPath(obj: Record<string, unknown>, path: string, value: unknown): void {
+    const parts = path.split(".").filter(Boolean);
+    if (parts.length === 0) return;
+    let cur: Record<string, unknown> = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+        const k = parts[i];
+        const next = cur[k];
+        if (next == null || typeof next !== "object" || Array.isArray(next)) {
+            cur[k] = {};
+        }
+        cur = cur[k] as Record<string, unknown>;
+    }
+    cur[parts[parts.length - 1]] = value;
+}
+
+/** `type: "children"` 컬럼 붙여넣기 — `valueString` 갱신 */
+export function applyChildrenPasteValue(
+    row: Record<string, unknown>,
+    columnKey: string,
+    value: unknown,
+): boolean {
+    const u = columnKey.indexOf("_");
+    if (u <= 0 || u >= columnKey.length - 1) return false;
+    const fieldPath = columnKey.slice(0, u);
+    const keyToken = columnKey.slice(u + 1);
+    const arr = getValue(row, fieldPath);
+    if (!Array.isArray(arr)) return false;
+
+    let found = false;
+    const nextArr = arr.map((el) => {
+        if (!el || typeof el !== "object") return el;
+        const rec = el as Record<string, unknown>;
+        if (!keyStringMatchesToken(keyToken, childrenItemMatchKey(rec))) return el;
+        found = true;
+        return { ...rec, valueString: String(value ?? "") };
+    });
+    if (!found) return false;
+    setValueAtPath(row, fieldPath, nextArr);
+    return true;
+}
+
+/**
+ * 붙여넣기 값을 행 객체에 반영한다.
+ * @param columnType `Header.type` — `children`이면 배열 항목 `valueString` 수정
+ */
+export function applyPasteValueToRow(
+    row: unknown,
+    columnKey: string,
+    value: unknown,
+    columnType?: string,
+): boolean {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+    const record = row as Record<string, unknown>;
+    if (columnType === "children") {
+        return applyChildrenPasteValue(record, columnKey, value);
+    }
+    record[columnKey] = value;
+    return true;
+}
+
 export function resolveChildrenCellValue(row: unknown, columnKey: string | undefined | null): unknown {
     if (!row || typeof row !== "object" || columnKey == null || columnKey === "") return undefined;
     const u = columnKey.indexOf("_");

@@ -36,13 +36,22 @@ export type GridType ={
      * 행 데이터 갱신은 호출 측(부모 state / API)에서 처리한다.
      */
     onCellChange?: (event: GridCellChangeEvent) => void | Promise<void>
+    /**
+     * `editable` + 붙여넣기(Ctrl+V) 시 호출.
+     * 같은 `columnKey`·`value`는 `rowIds` 배열로 묶어 한 번에 전달한다.
+     */
+    onCellsPaste?: (batches: GridCellPasteBatch[]) => void | Promise<void>
+    /** `onCellsPaste`·선택 식별용 행 id 필드 (기본 `id`) */
+    rowIdKey?: string
     /** 생략·`basic`은 기본 스타일. `linear`는 툴바·헤더 흰 배경, 본문 홀수 행(1·3·5…) 줄무늬. */
     theme?: JsGridTheme
     /** `true`일 때만 헤더에서 열 너비 드래그·리사이즈 핸들(`|`)이 표시·동작한다. */
     resizable?: boolean
     /**
-     * `true`이고 전체보기(pseudo fullscreen)일 때만 `Header.editor` 셀을 **클릭**해 편집한다.
-     * 일반 화면에서는 `onRowClick`만 사용한다. 전체보기 중에는 `onRowClick`이 호출되지 않는다.
+     * `true`이고 전체보기일 때 본문 셀 편집 모드:
+     * - 클릭: 선택(배경·복사)
+     * - 같은 셀 재클릭: `editor` 열림
+     * - 세로 드래그(동일 열): 범위 선택 → `onCellsPaste`
      * (기본값: `false`)
      */
     editable?: boolean
@@ -94,6 +103,24 @@ export type GridCellChangeEvent = {
     columnKey: string;
     value: unknown;
     previousValue: unknown;
+};
+
+export type GridCellPasteItem = {
+    row: unknown;
+    rowId: string | number | null | undefined;
+    columnKey: string;
+    rowIndex: number;
+    value: unknown;
+    previousValue: unknown;
+};
+
+/** 붙여넣기 API용 — 동일 열·값에 대한 `rowIds` 묶음 */
+export type GridCellPasteBatch = {
+    columnKey: string;
+    value: unknown;
+    rowIds: Array<string | number>;
+    /** 화면 state 갱신용(행별 이전 값·인덱스 포함) */
+    items: GridCellPasteItem[];
 };
 
 export type DataType = 'string' | 'number' | 'state' | 'date' | 'score' | 'children';
