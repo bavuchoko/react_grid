@@ -82,7 +82,8 @@ const App = () => {
             "key": "assetCode",
             "label": "자산코드",
             "type": "string",
-            "width": 105
+            "width": 105,
+            filterable: true,
         },
         {
             "key": "groupName",

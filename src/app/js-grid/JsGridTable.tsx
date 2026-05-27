@@ -13,7 +13,7 @@ import {
 } from "./gridStyles.ts";
 import {computeRowNumber} from "./rowNumber.ts";
 import type {CSSProperties, MutableRefObject, ReactNode} from "react";
-import React, {isValidElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
+import React, {isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState} from "react";
 import type {
     GridCellChangeEvent,
     GridCellPasteBatch,
@@ -216,6 +216,12 @@ type Props = {
     theme?: JsGridTheme | string;
     /** `true`일 때 셀 선택·재클릭 편집·세로 드래그·붙여넣기 */
     editable?: boolean;
+    /** 필터가 활성된 컬럼 key 집합 — 헤더 아이콘 강조용 */
+    filteredColumnKeys?: ReadonlySet<string>;
+    /** 현재 열려있는 필터 메뉴의 컬럼 key */
+    openFilterColumnKey?: string | null;
+    /** 헤더 필터 아이콘 클릭 시 호출(좌표 포함). 미지정이면 아이콘 자체를 표시하지 않는다. */
+    onToggleColumnFilter?: (args: { columnKey: string; top: number; left: number }) => void;
 };
 
 type DragState = {
@@ -695,6 +701,58 @@ export default function JsGridTable(props: Props) {
                                                     ))}
                                             </span>
                                         )}
+                                        {column.filterable && props.onToggleColumnFilter ? (() => {
+                                            const isOpen = props.openFilterColumnKey === column.key;
+                                            const isActive = props.filteredColumnKeys?.has(column.key) === true;
+                                            return (
+                                                <span
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    aria-label={`${column.label} 필터`}
+                                                    data-jsgrid-filter-trigger="1"
+                                                    data-active={isOpen ? "1" : "0"}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                        props.onToggleColumnFilter?.({
+                                                            columnKey: column.key,
+                                                            top: rect.bottom + 4,
+                                                            left: rect.left,
+                                                        });
+                                                    }}
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        width: SORT_ICON_PX,
+                                                        minWidth: SORT_ICON_PX,
+                                                        height: SORT_ICON_PX,
+                                                        cursor: 'pointer',
+                                                        borderRadius: 2,
+                                                        color: isActive ? '#1d4ed8' : '#9ca3af',
+                                                        backgroundColor: isOpen
+                                                            ? 'rgba(29,78,216,0.12)'
+                                                            : undefined,
+                                                    }}
+                                                >
+                                                    <svg
+                                                        viewBox="0 0 16 16"
+                                                        width={SORT_ICON_PX - 2}
+                                                        height={SORT_ICON_PX - 2}
+                                                        aria-hidden
+                                                        focusable="false"
+                                                    >
+                                                        <path
+                                                            d="M2 3h12l-4.5 5.5V13l-3 1V8.5L2 3z"
+                                                            fill={isActive ? '#1d4ed8' : 'none'}
+                                                            stroke="currentColor"
+                                                            strokeWidth="1.2"
+                                                            strokeLinejoin="round"
+                                                        />
+                                                    </svg>
+                                                </span>
+                                            );
+                                        })() : null}
                                     </div>
                                     )}
                                     {!isCheckbox && !isRowNum && props.onColumnWidthChange ? (

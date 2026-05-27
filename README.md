@@ -57,6 +57,8 @@ export default function Example() {
     - 함수형: `({ row, value, columnKey, rowIndex }) => ReactNode`
     - JSX/ReactNode: element일 경우 내부적으로 `row/value/columnKey/rowIndex` props를 주입하여 렌더링
   - `editor`: 편집 UI 컴포넌트(선택). **`editable={true}`일 때만** 해당 컬럼 본문 셀 **더블클릭**으로 연다. 함수형·JSX 주입 지원, `onChange`, `onClose` 주입.
+  - `filterable`: `true`면 헤더에 엑셀 스타일 필터 아이콘(깔때기)이 표시되어 클라이언트 사이드 다중 선택 필터링이 활성화된다. (자세한 내용은 [Header.filterable — 엑셀 스타일 헤더 필터](#headerfilterable--엑셀-스타일-헤더-필터) 참고)
+  - `getFilterValue`: 필터 후보값을 커스텀 추출(선택). 생략 시 `key`로 `getValue(row, key)` 또는 `children` resolver를 사용.
 - **`data?: { content?: unknown[]; pageable?: Page; totalElements?: number; totalPages?: number }`**: 페이지 데이터
 
 #### `Header.render` 사용 예시
@@ -129,6 +131,36 @@ const header: Header[] = [
 - `onChange(nextValue, { close: true })` — 값 적용 후 팝업 닫기
 - `onClose()` — 적용 없이 닫기(모달·드로어 완료 버튼 등)
 - 인풋·달력·드로어·모달 등 **임의 React 컴포넌트**를 `editor`에 넣을 수 있습니다.
+
+#### `Header.filterable` — 엑셀 스타일 헤더 필터
+
+`filterable: true`를 지정한 컬럼은 헤더에 깔때기 아이콘이 표시되고, 클릭하면 엑셀과 비슷한 체크리스트 드롭다운이 열립니다.
+
+- **검색 input** — 부분 일치(contains)로 옵션 좁히기
+- **전체 선택** — 검색 결과 한정, `indeterminate` 지원
+- **값 목록** — 현재 페이지 데이터에서 추출한 고유값 + 행 수, 가나다·숫자 정렬
+- **`(비어 있음)`** — `null` / `undefined` / 빈 문자열은 자동으로 한 옵션으로 묶임
+- **초기화 / 적용** — 0개 체크 상태에서는 「적용」이 비활성화(필터를 풀려면 「초기화」)
+
+여러 컬럼에 동시에 적용하면 **AND**로 결합되고, 현재 페이지 행만 필터링합니다(현재 페이지에 로드된 데이터 한정).
+
+```tsx
+const header: Header[] = [
+  { key: "status", label: "상태", type: "string", filterable: true },
+  {
+    key: "createdBy",
+    label: "등록자",
+    type: "string",
+    filterable: true,
+    // 중첩 객체에서 표시·필터 키 추출. 미지정 시 `getValue(row, "createdBy")` 사용.
+    getFilterValue: (row) => (row as any).createdBy?.name,
+  },
+];
+```
+
+`getFilterValue`가 배열을 반환하면 각 원소가 별도 옵션으로 펼쳐지고, 그 중 하나라도 선택값에 매칭되면 행이 표시됩니다(다중 태그 셀에 유용).
+
+> 클라이언트 사이드 필터입니다. 다른 페이지의 데이터는 옵션 목록에 나오지 않고, `Pagination`의 `totalElements`는 서버 응답값이 그대로 유지됩니다.
 
 ### 이벤트/액션
 
@@ -376,6 +408,7 @@ import type { JsGridToolbarApi } from "@bavuchoko/js-grid";
 
 - **정렬**: 헤더 클릭으로 정렬 변경(ASC/DESC)
 - **컬럼 고정**: 헤더를 **Alt+클릭**하면 해당 컬럼까지 왼쪽 고정
+- **컬럼 필터**: `Header.filterable: true`인 컬럼은 헤더 깔때기 아이콘으로 엑셀 스타일 다중 선택 필터(검색·전체 선택·카운트 표시)를 사용합니다. 여러 컬럼 동시 적용 시 AND 결합, 클라이언트 사이드(현재 페이지) 동작.
 - **컬럼 설정**: 컬럼 표시/숨김 및 순서 변경(툴바의 컬럼 아이콘)
 - **컬럼 넓이 조정(리사이즈)**: 헤더 셀의 **오른쪽 경계(리사이즈 핸들)**를 드래그하여 너비를 조절
   - 체크박스/행번호 컬럼은 리사이즈 대상이 아닙니다.

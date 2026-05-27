@@ -31,6 +31,8 @@ import Pagination from "./js-grid/Pagination.tsx";
 import {useColumnWidths} from "./js-grid/useColumnWidths.ts";
 import {useFreezeColumns} from "./js-grid/useFreezeColumns.ts";
 import {gridThemeContainerBorder, resolveJsGridTheme} from "./js-grid/gridTheme.ts";
+import {applyColumnFilters, buildColumnFilterOptions} from "./js-grid/columnFilter.ts";
+import ColumnFilterMenu from "./js-grid/ColumnFilterMenu.tsx";
 import "./js-grid/js-grid-layout.css";
 
 function headerSaveErrorMessage(err: unknown): string {
@@ -48,7 +50,6 @@ function headerSaveErrorMessage(err: unknown): string {
 }
 
 const JsGrid =(props:GridType)=> {
-    const data = props.data?.content ?? []
     const header = props.header;
     const headerList: Header[] = header ?? [];
     const page = {...props.data?.pageable,
@@ -154,12 +155,103 @@ const JsGrid =(props:GridType)=> {
                     type: h?.type,
                     render: h?.render,
                     editor: h?.editor,
+                    filterable: h?.filterable,
+                    getFilterValue: h?.getFilterValue,
                 };
             });
         const rowNum = { key: "__rownum__", label: "#", __rownum__: true as const };
         const cb = { key: "__checkbox__", label: "", __checkbox__: true as const };
         return showRowSelection ? [cb, rowNum, ...visible] : [rowNum, ...visible];
     }, [userColumns, showRowSelection, header]);
+
+    /** 컬럼별 허용 필터 토큰 집합. 키가 없으면 필터 없음(모두 표시). */
+    const [columnFilters, setColumnFilters] = useState<Record<string, ReadonlySet<string>>>({});
+    const [openFilterColumnKey, setOpenFilterColumnKey] = useState<string | null>(null);
+    const [filterMenuPos, setFilterMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+    /** 헤더 컬럼 구성이 바뀌면 사라진 컬럼의 필터를 정리 */
+    const filterableKeysSig = useMemo(
+        () => columns.filter((c) => c.filterable).map((c) => c.key).join("\u0001"),
+        [columns],
+    );
+    useEffect(() => {
+        setColumnFilters((prev) => {
+            const next: Record<string, ReadonlySet<string>> = {};
+            const allowed = new Set(columns.filter((c) => c.filterable).map((c) => c.key));
+            let changed = false;
+            for (const [k, v] of Object.entries(prev)) {
+                if (allowed.has(k)) next[k] = v;
+                else changed = true;
+            }
+            return changed ? next : prev;
+        });
+        setOpenFilterColumnKey((prev) => (prev != null && !columns.some((c) => c.key === prev) ? null : prev));
+    }, [filterableKeysSig, columns]);
+
+    const filteredColumnKeys = useMemo(
+        () => new Set(Object.keys(columnFilters)),
+        [columnFilters],
+    );
+
+    const filterableColumnsForData = useMemo(
+        () => columns.filter((c) => c.filterable),
+        [columns],
+    );
+
+    const rawData = useMemo(() => props.data?.content ?? [], [props.data?.content]);
+    const filteredData = useMemo(
+        () => applyColumnFilters(rawData, filterableColumnsForData, columnFilters) as unknown[],
+        [rawData, filterableColumnsForData, columnFilters],
+    );
+    const data = filteredData;
+
+    const openFilterColumn = useMemo(
+        () =>
+            openFilterColumnKey
+                ? columns.find((c) => c.key === openFilterColumnKey) ?? null
+                : null,
+        [openFilterColumnKey, columns],
+    );
+    const openFilterOptions = useMemo(
+        () => (openFilterColumn ? buildColumnFilterOptions(rawData, openFilterColumn) : []),
+        [openFilterColumn, rawData],
+    );
+
+    const handleToggleColumnFilter = useCallback(
+        (args: { columnKey: string; top: number; left: number }) => {
+            setOpenFilterColumnKey((prev) => {
+                if (prev === args.columnKey) {
+                    setFilterMenuPos(null);
+                    return null;
+                }
+                setFilterMenuPos({ top: args.top, left: args.left });
+                return args.columnKey;
+            });
+        },
+        [],
+    );
+
+    const handleApplyColumnFilter = useCallback(
+        (columnKey: string, next: ReadonlySet<string> | null) => {
+            setColumnFilters((prev) => {
+                const out = { ...prev };
+                if (next == null) {
+                    delete out[columnKey];
+                } else {
+                    out[columnKey] = next;
+                }
+                return out;
+            });
+            setOpenFilterColumnKey(null);
+            setFilterMenuPos(null);
+        },
+        [],
+    );
+
+    const closeColumnFilter = useCallback(() => {
+        setOpenFilterColumnKey(null);
+        setFilterMenuPos(null);
+    }, []);
 
     const [isFieldsMenuOpen, setIsFieldsMenuOpen] = useState(false);
     const [fieldsSaveBusy, setFieldsSaveBusy] = useState(false);
@@ -591,6 +683,18 @@ const JsGrid =(props:GridType)=> {
                     }}
                 />
 
+                <ColumnFilterMenu
+                    open={openFilterColumnKey != null && filterMenuPos != null}
+                    pos={filterMenuPos}
+                    columnLabel={openFilterColumn?.label ?? ""}
+                    options={openFilterOptions}
+                    selected={openFilterColumnKey ? (columnFilters[openFilterColumnKey] ?? null) : null}
+                    onApply={(next) => {
+                        if (openFilterColumnKey) handleApplyColumnFilter(openFilterColumnKey, next);
+                    }}
+                    onClose={closeColumnFilter}
+                />
+
                 <div
                     style={{
                         flex: "1 1 0%",
@@ -633,6 +737,9 @@ const JsGrid =(props:GridType)=> {
                             onCellChange={props.onCellChange}
                             onCellsPaste={props.onCellsPaste}
                             rowIdKey={props.rowIdKey}
+                            filteredColumnKeys={filteredColumnKeys}
+                            openFilterColumnKey={openFilterColumnKey}
+                            onToggleColumnFilter={handleToggleColumnFilter}
                             onSortChange={(next) => {
                                 setSortKey(next.key);
                                 setSortDir(next.direction);
