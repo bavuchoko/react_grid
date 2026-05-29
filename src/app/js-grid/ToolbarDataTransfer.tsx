@@ -154,7 +154,6 @@ export default function ToolbarDataTransfer({
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    opacity: busy || interactionDisabled ? 0.45 : 1,
                     ...(textControl ? {} : { lineHeight: 0 }),
                 }}
             >
