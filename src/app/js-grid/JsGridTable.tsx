@@ -808,7 +808,11 @@ export default function JsGridTable(props: Props) {
                             }
                             onClick={
                                 props.onRowClick
-                                    ? () => props.onRowClick?.(row)
+                                    ? (e) => {
+                                        const target = e.target as HTMLElement;
+                                        if (target.closest(".js-grid-chk")) return;
+                                        props.onRowClick?.(row);
+                                    }
                                     : undefined
                             }
                             style={{
@@ -910,6 +914,10 @@ export default function JsGridTable(props: Props) {
                                 };
 
                                 const onTdClick = (e: React.MouseEvent<HTMLTableCellElement>) => {
+                                    if (isCheckbox) {
+                                        e.stopPropagation();
+                                        return;
+                                    }
                                     if (selectable || column.render) {
                                         e.stopPropagation();
                                     }

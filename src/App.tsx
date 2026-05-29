@@ -2351,7 +2351,6 @@ const App = () => {
                 editable={true}
                 resizable={true}
                 theme={'linear'}
-
                 toolbarStart={() => (
                     <div style={demoToolbarCustomGap}>
                         <ToolbarAsyncAction
