@@ -30,8 +30,12 @@
   },
   "peerDependencies": {
     "@bavuchoko/js-tooltip": "^0.1.0",
+    "@tanstack/react-virtual": ">=3.0.0",
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0"
+  },
+  "dependencies": {
+    "@tanstack/react-virtual": "^3.14.3"
   },
   "devDependencies": {
     "@bavuchoko/js-tooltip": "^0.1.0",

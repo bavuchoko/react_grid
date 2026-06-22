@@ -10,3 +10,5 @@ export const CELL_MAX_WIDTH_PX = 280;
 /** 사용자가 헤더 드래그로 줄일 수 있는 최소 열 너비 */
 export const COL_RESIZE_MIN_PX = 130;
 export const COL_RESIZE_MAX_PX = 640;
+/** 헤더 셀 오른쪽: 리사이즈 핸들(최대 10px) + 콘텐츠와의 간격 */
+export const HEADER_COL_RESIZE_CLEARANCE_PX = 14;

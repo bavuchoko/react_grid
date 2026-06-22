@@ -9,11 +9,21 @@ import {
     COL_RESIZE_MAX_PX,
     COL_RESIZE_MIN_PX,
     GRID_SORT_ICON_SLOT_PX,
+    HEADER_COL_RESIZE_CLEARANCE_PX,
     LINEAR_CELL_PADDING_X,
 } from "./gridStyles.ts";
 import {computeRowNumber} from "./rowNumber.ts";
 import type {CSSProperties, MutableRefObject, ReactNode} from "react";
-import React, {isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState} from "react";
+import React, {
+    isValidElement,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import {useVirtualizer} from "@tanstack/react-virtual";
 import type {
     GridCellChangeEvent,
     GridCellPasteBatch,
@@ -34,10 +44,17 @@ import {
 import ASC from "../resources/icon/ASC.tsx";
 import DESC from "../resources/icon/DESC.tsx";
 import {gridThemeCellBorders, gridThemeStyles, resolveJsGridTheme, type JsGridTheme} from "./gridTheme.ts";
+import {
+    bodyCellStateClassNames,
+    bodyRowClassName,
+    gridColClassNames,
+} from "./gridClassNames.ts";
 
 export type {JsGridTableColumn} from "../type/Type.ts";
 
 const SORT_ICON_PX = GRID_SORT_ICON_SLOT_PX;
+/** tbody 행 높이 — `js-grid-layout.css` `--js-grid-row-height` 와 동일 */
+const ROW_HEIGHT_PX = 30;
 
 type CellEditorSession = {
     rowIndex: number;
@@ -55,34 +72,37 @@ function colWidthCss(wPx: number | null | undefined): CSSProperties {
     };
 }
 
-function gridColClassNames(
-    cdex: number,
-    column: Pick<JsGridTableColumn, "__checkbox__" | "__rownum__">,
-    role: "th" | "td",
-): string {
-    const parts = [
-        role === "th" ? "js-grid-th" : "js-grid-row",
-        "js-grid-cell",
-        "js-grid-col",
-        `js-grid-col-${cdex}`,
-    ];
-    if (column.__checkbox__) parts.push("js-grid-chk");
-    if (column.__rownum__) parts.push("js-grid-idx");
-    return parts.join(" ");
+function sumWidths(widths: readonly number[]): number {
+    let s = 0;
+    for (let i = 0; i < widths.length; i++) s += widths[i];
+    return s;
 }
 
-type TruncatingTdProps = React.TdHTMLAttributes<HTMLTableCellElement> & {
+function lockedColumnStyle(lockedPx: number | undefined): CSSProperties | undefined {
+    if (lockedPx == null || lockedPx <= 0) return undefined;
+    const px = `${lockedPx}px`;
+    return {
+        width: px,
+        minWidth: px,
+        maxWidth: px,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+    };
+}
+
+type TruncatingDivProps = React.HTMLAttributes<HTMLDivElement> & {
     children: ReactNode;
 };
 
 /** 말줄임이 실제로 일어난 경우에만 `title`로 전체 텍스트(호버 툴팁)를 붙인다. */
-function TruncatingTd({
+function TruncatingDiv({
     children,
     style,
     skipResizeObserve,
     ...rest
-}: TruncatingTdProps & { skipResizeObserve?: boolean }) {
-    const ref = useRef<HTMLTableCellElement>(null);
+}: TruncatingDivProps & { skipResizeObserve?: boolean }) {
+    const ref = useRef<HTMLDivElement>(null);
     const [title, setTitle] = useState<string | undefined>(undefined);
 
     const measure = useCallback(() => {
@@ -115,9 +135,9 @@ function TruncatingTd({
     }, [measure, children, skipResizeObserve]);
 
     return (
-        <td ref={ref} {...rest} style={style} title={title}>
+        <div role="presentation" ref={ref} {...rest} style={style} title={title}>
             {children}
-        </td>
+        </div>
     );
 }
 
@@ -200,13 +220,15 @@ type Props = {
     page: Page;
     sortKey: string | null;
     /** 미지정·ASC는 ASC 아이콘, DESC만 DESC 아이콘 */
-    sortDir?: 'ASC' | 'DESC';
+    sortDir?: "ASC" | "DESC";
     headerCellRefs: MutableRefObject<Array<HTMLTableCellElement | null>>;
     colWidthByKey: Record<string, number>;
+    /** 헤더 측정·override 합산 너비 — 가상 본문 `grid-template-columns` 정렬용 */
+    columnLayoutWidths: Record<string, number>;
     freezeUntilIndex: number | null;
     onFreezeColumn: (colIndex: number) => void;
     getStickyStyle: (args: { colIndex: number; isHeader: boolean }) => CSSProperties | undefined;
-    onSortChange: (next: { key: string; direction: 'ASC' | 'DESC' }) => void;
+    onSortChange: (next: { key: string; direction: "ASC" | "DESC" }) => void;
     rowSelection?: RowSelectionProps;
     onRowClick?: (row: unknown) => void;
     onCellChange?: (event: GridCellChangeEvent) => void | Promise<void>;
@@ -270,6 +292,49 @@ export default function JsGridTable(props: Props) {
     const [cellRange, setCellRange] = useState<GridCellRange | null>(null);
     const dragStateRef = useRef<DragState | null>(null);
     const lastClickRef = useRef<{ rowIndex: number; columnKey: string } | null>(null);
+
+    const colsLen = props.columns.length;
+
+    const effectiveColWidths = useMemo(() => {
+        const out = new Array<number>(colsLen);
+        for (let i = 0; i < colsLen; i++) {
+            const col = props.columns[i];
+            const colKey = String(col?.key ?? i);
+            const isCheckbox = Boolean(col?.__checkbox__);
+            const isRowNum = Boolean(col?.__rownum__);
+            const override = props.colWidthByKey[colKey];
+            const layout = props.columnLayoutWidths[colKey];
+            if (override != null && override > 0) {
+                out[i] = Math.round(override);
+            } else if (layout != null && layout > 0) {
+                out[i] = Math.round(layout);
+            } else if (isCheckbox) {
+                out[i] = 40;
+            } else if (isRowNum) {
+                out[i] = 56;
+            } else {
+                out[i] = COL_RESIZE_MIN_PX;
+            }
+        }
+        return out;
+    }, [colsLen, props.columns, props.colWidthByKey, props.columnLayoutWidths]);
+
+    const colWidthsReady =
+        effectiveColWidths.length === colsLen && effectiveColWidths.every((w) => w > 0);
+    const totalGridWidth = colWidthsReady ? sumWidths(effectiveColWidths) : 0;
+
+    // eslint-disable-next-line react-hooks/incompatible-library
+    const rowVirtualizer = useVirtualizer({
+        count: props.data.length,
+        getScrollElement: () => tableScrollRef.current,
+        estimateSize: () => ROW_HEIGHT_PX,
+        overscan: 10,
+    });
+
+    useEffect(() => {
+        if (!editorSession) return;
+        rowVirtualizer.scrollToIndex(editorSession.rowIndex, { align: "auto" });
+    }, [editorSession, rowVirtualizer]);
 
     useEffect(() => {
         if (!editingEnabled) {
@@ -371,10 +436,10 @@ export default function JsGridTable(props: Props) {
     const resolveBodyCellFromPoint = useCallback(
         (clientX: number, clientY: number): { rowIndex: number; columnKey: string } | null => {
             const el = document.elementFromPoint(clientX, clientY);
-            const td = el?.closest<HTMLTableCellElement>("[data-jsgrid-body-cell]");
-            if (!td) return null;
-            const rowIndex = Number(td.dataset.jsgridRow);
-            const columnKey = td.dataset.jsgridCol;
+            const cell = el?.closest<HTMLElement>("[data-jsgrid-body-cell]");
+            if (!cell) return null;
+            const rowIndex = Number(cell.dataset.jsgridRow);
+            const columnKey = cell.dataset.jsgridCol;
             if (!Number.isFinite(rowIndex) || !columnKey) return null;
             return { rowIndex, columnKey };
         },
@@ -400,6 +465,7 @@ export default function JsGridTable(props: Props) {
                 setCellRange(
                     normalizeCellRange(drag.columnKey, drag.anchorRow, hit.rowIndex),
                 );
+                rowVirtualizer.scrollToIndex(hit.rowIndex, { align: "auto" });
             }
         };
 
@@ -417,7 +483,7 @@ export default function JsGridTable(props: Props) {
             window.removeEventListener("pointerup", onPointerUp);
             window.removeEventListener("pointercancel", onPointerUp);
         };
-    }, [editingEnabled, finishDragClick, props.columns, resolveBodyCellFromPoint]);
+    }, [editingEnabled, finishDragClick, props.columns, resolveBodyCellFromPoint, rowVirtualizer]);
 
     const buildPasteItems = useCallback(
         (range: GridCellRange, lines: string[]): GridCellPasteItem[] => {
@@ -523,483 +589,710 @@ export default function JsGridTable(props: Props) {
         return () => window.removeEventListener("mousedown", onDown);
     }, [editingEnabled]);
 
+    const gridTableWidth =
+        totalGridWidth > 0 ? totalGridWidth : isEmpty ? "100%" : "max-content";
+
     return (
         <div
             className="js-grid-table-scroll"
             ref={tableScrollRef}
             tabIndex={editingEnabled ? -1 : undefined}
+            style={{ outline: "none" }}
         >
-            <table
-                className="js-grid-table"
+            <div
                 style={{
-                    width: isEmpty ? '100%' : 'max-content',
-                    minWidth: isEmpty ? '100%' : undefined,
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 10,
+                    width: totalGridWidth > 0 ? totalGridWidth : "max-content",
+                    minWidth: "100%",
                 }}
             >
-                <thead style={{backgroundColor: themeStyles.headerBg}}>
-                    <tr className="js-grid-head-row">
-                        {props.columns.map((column, cdex) => {
-                            const isRowNum = Boolean(column.__rownum__);
-                            const isCheckbox = Boolean(column.__checkbox__);
-                            const colKey = String(column.key ?? cdex);
-                            const wPx = props.colWidthByKey[colKey];
-                            const hasW = wPx != null && wPx > 0;
-                            const isDataCol = !isCheckbox && !isRowNum;
-                            /** `header.width`/측정 전: CSS `max-content`로 라벨이 잘리지 않게 한 뒤 DOM에서 px 확정 */
-                            const intrinsicLabelCol = isDataCol && !hasW && !freezeActive;
-                            return (
-                                <th
-                                    key={colKey}
-                                    className={gridColClassNames(cdex, column, "th")}
-                                    ref={(el) => { props.headerCellRefs.current[cdex] = el; }}
-                                    onClick={(e) => {
-                                        if ((e.target as HTMLElement).closest("[data-jsgrid-col-resize=\"1\"]")) return;
-                                        if (e.altKey) {
-                                            props.onFreezeColumn(cdex);
-                                            return;
-                                        }
-                                        if (isCheckbox) {
-                                            props.rowSelection?.onToggleAll();
-                                            return;
-                                        }
-                                        if (isRowNum) return;
-                                        const same = props.sortKey === column.key;
-                                        const nextDir: 'ASC' | 'DESC' = same
-                                            ? (props.sortDir === 'DESC' ? 'ASC' : 'DESC')
-                                            : 'ASC';
-                                        props.onSortChange({ key: column.key, direction: nextDir });
-                                    }}
-                                    style={{
-                                        position: 'sticky',
-                                        top: 0,
-                                        zIndex: 4,
-                                        backgroundColor: themeStyles.headerBg,
-                                        ...cellBorders,
-                                        boxSizing: 'border-box',
-                                        cursor: isCheckbox ? 'pointer' : isRowNum ? 'default' : 'pointer',
-                                        userSelect: 'none',
-                                        textAlign: isCheckbox || isRowNum ? 'center' : isLinear ? 'left' : 'center',
-                                        paddingRight: isRowNum ? 10 : undefined,
-                                        paddingLeft:
-                                            isLinear && !isCheckbox && !isRowNum
-                                                ? LINEAR_CELL_PADDING_X
-                                                : undefined,
-                                        ...(hasW
-                                            ? colWidthCss(wPx)
-                                            : isCheckbox || isRowNum
-                                              ? {
-                                                  minWidth: isCheckbox ? '40px' : '56px',
-                                                }
-                                              : {
-                                                  minWidth: COL_RESIZE_MIN_PX,
-                                                  maxWidth: CELL_MAX_WIDTH_PX,
-                                                  overflow: 'hidden',
-                                                  textOverflow: 'ellipsis',
-                                                  whiteSpace: 'nowrap',
-                                              }),
-                                        ...(isCheckbox || isRowNum
-                                            ? {}
-                                            : hasW
-                                              ? { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-                                              : {}),
-                                        ...props.getStickyStyle({ colIndex: cdex, isHeader: true }),
-                                    }}
-                                >
-                                    {isCheckbox && props.rowSelection ? (
-                                        <div className="js-grid-cell-inner" style={{ justifyContent: 'center' }}>
-                                            <input
-                                                type="checkbox"
-                                                className="js-grid-chk-box"
-                                                checked={props.rowSelection.headerChecked}
-                                                disabled={props.rowSelection.pageRowKeys.length === 0}
-                                                readOnly
-                                                style={{ pointerEvents: 'none' }}
-                                            />
-                                        </div>
-                                    ) : (
-                                    <div
-                                        className="js-grid-cell-inner"
-                                        style={{
-                                            justifyContent: isRowNum ? 'center' : isLinear ? 'flex-start' : 'center',
-                                            paddingLeft: isLinear ? 0 : undefined,
-                                            paddingRight: isLinear ? 6 : undefined,
-                                            gap: 2,
-                                        }}
-                                    >
-                                        {/* basic: 오른쪽 sort 아이콘과 대칭되는 왼쪽 빈 칸 → 제목 가운데 정렬 */}
-                                        {!isRowNum && !isLinear && (
-                                            <span
-                                                style={{
-                                                    display: 'inline-block',
-                                                    flexShrink: 0,
-                                                    width: SORT_ICON_PX,
-                                                    minWidth: SORT_ICON_PX,
-                                                    height: SORT_ICON_PX,
-                                                }}
-                                                aria-hidden
-                                            />
-                                        )}
-                                        <span
-                                            style={{
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap',
-                                                minWidth: 0,
-                                                flex: intrinsicLabelCol ? '1 1 auto' : undefined,
-                                            }}
-                                        >
-                                            {column.label}
-                                        </span>
-                                        {!isRowNum && (
-                                            <span
-                                                style={{
-                                                    display: 'inline-flex',
-                                                    flexShrink: 0,
-                                                    width: SORT_ICON_PX,
-                                                    minWidth: SORT_ICON_PX,
-                                                    height: SORT_ICON_PX,
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                }}
-                                                aria-hidden={props.sortKey !== column.key}
-                                            >
-                                                {props.sortKey === column.key &&
-                                                    (props.sortDir === 'DESC' ? (
-                                                        <span
-                                                            style={{ display: 'inline-flex', flex: '0 0 auto' }}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                props.onSortChange({ key: column.key, direction: 'ASC' });
-                                                            }}
-                                                        >
-                                                            <DESC
-                                                                style={{
-                                                                    width: SORT_ICON_PX,
-                                                                    height: SORT_ICON_PX,
-                                                                    cursor: 'pointer',
-                                                                    color: '#111827',
-                                                                }}
-                                                            />
-                                                        </span>
-                                                    ) : (
-                                                        <span
-                                                            style={{ display: 'inline-flex', flex: '0 0 auto' }}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                props.onSortChange({ key: column.key, direction: 'DESC' });
-                                                            }}
-                                                        >
-                                                            <ASC
-                                                                style={{
-                                                                    width: SORT_ICON_PX,
-                                                                    height: SORT_ICON_PX,
-                                                                    cursor: 'pointer',
-                                                                    color: '#111827',
-                                                                }}
-                                                            />
-                                                        </span>
-                                                    ))}
-                                            </span>
-                                        )}
-                                        {column.filterable && props.onToggleColumnFilter ? (() => {
-                                            const isOpen = props.openFilterColumnKey === column.key;
-                                            const isActive = props.filteredColumnKeys?.has(column.key) === true;
-                                            return (
-                                                <span
-                                                    role="button"
-                                                    tabIndex={0}
-                                                    aria-label={`${column.label} 필터`}
-                                                    data-jsgrid-filter-trigger="1"
-                                                    data-active={isOpen ? "1" : "0"}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                                        props.onToggleColumnFilter?.({
-                                                            columnKey: column.key,
-                                                            top: rect.bottom + 4,
-                                                            left: rect.left,
-                                                        });
-                                                    }}
-                                                    style={{
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        width: SORT_ICON_PX,
-                                                        minWidth: SORT_ICON_PX,
-                                                        height: SORT_ICON_PX,
-                                                        cursor: 'pointer',
-                                                        borderRadius: 2,
-                                                        color: isActive ? '#1d4ed8' : '#9ca3af',
-                                                        backgroundColor: isOpen
-                                                            ? 'rgba(29,78,216,0.12)'
-                                                            : undefined,
-                                                    }}
-                                                >
-                                                    <svg
-                                                        viewBox="0 0 16 16"
-                                                        width={SORT_ICON_PX - 2}
-                                                        height={SORT_ICON_PX - 2}
-                                                        aria-hidden
-                                                        focusable="false"
-                                                    >
-                                                        <path
-                                                            d="M2 3h12l-4.5 5.5V13l-3 1V8.5L2 3z"
-                                                            fill={isActive ? '#1d4ed8' : 'none'}
-                                                            stroke="currentColor"
-                                                            strokeWidth="1.2"
-                                                            strokeLinejoin="round"
-                                                        />
-                                                    </svg>
-                                                </span>
-                                            );
-                                        })() : null}
-                                    </div>
-                                    )}
-                                    {!isCheckbox && !isRowNum && props.onColumnWidthChange ? (
-                                        <HeaderColumnResizeHandle
-                                            minPx={COL_RESIZE_MIN_PX}
-                                            maxPx={COL_RESIZE_MAX_PX}
-                                            showGrip={isLinear}
-                                            onResize={(w) => props.onColumnWidthChange?.(column.key, w)}
-                                        />
-                                    ) : null}
-                                </th>
-                            );
-                        })}
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {isEmpty ? (
-                        <tr className="js-grid-empty-row">
-                            <td
-                                colSpan={colCount > 0 ? colCount : 1}
-                                className="js-grid-empty"
-                            >
-                                <div
-                                    className="js-grid-empty-message"
-                                    style={{
-                                        padding: '48px 16px',
-                                        textAlign: 'center',
-                                        color: '#6b7280',
-                                        fontSize: 14,
-                                        userSelect: 'none',
-                                    }}
-                                >
-                                    데이터가 없습니다
-                                </div>
-                            </td>
-                        </tr>
+                <table
+                    className="js-grid-table"
+                    style={{
+                        width: gridTableWidth,
+                        minWidth: isEmpty ? "100%" : undefined,
+                        tableLayout: colWidthsReady ? "fixed" : undefined,
+                        borderCollapse: "separate",
+                        borderSpacing: 0,
+                    }}
+                >
+                    {colWidthsReady ? (
+                        <colgroup>
+                            {effectiveColWidths.map((w, i) => (
+                                <col key={i} style={{ width: w }} />
+                            ))}
+                        </colgroup>
                     ) : null}
-                    {!isEmpty && props.data.map((row, rdex) => {
-                        const rowId = gridRowNumericId(row);
-                        const rowClass = isLinear ? "js-grid-body-row" : "border js-grid-body-row";
-                        const rowStripeClass =
-                            isLinear && themeStyles.bodyRowStripeBg && rdex % 2 === 0
-                                ? " js-grid-row-stripe"
-                                : "";
-                        return (
-                        <tr
-                            key={rowId ?? `r-${rdex}`}
-                            className={
-                                rowId != null
-                                    ? `${rowClass}${rowStripeClass} js-grid-row-idx-${rdex} js-grid-row-id-${rowId}`
-                                    : `${rowClass}${rowStripeClass} js-grid-row-idx-${rdex}`
-                            }
-                            onClick={
-                                props.onRowClick
-                                    ? (e) => {
-                                        const target = e.target as HTMLElement;
-                                        if (target.closest(".js-grid-chk")) return;
-                                        props.onRowClick?.(row);
-                                    }
-                                    : undefined
-                            }
-                            style={{
-                                cursor: props.onRowClick ? 'pointer' : undefined,
-                                ...(isLinear && themeStyles.bodyRowStripeBg && rdex % 2 === 0
-                                    ? { backgroundColor: themeStyles.bodyRowStripeBg }
-                                    : undefined),
-                            }}
-                        >
+                    <thead style={{ backgroundColor: themeStyles.headerBg }}>
+                        <tr className="js-grid-head-row">
                             {props.columns.map((column, cdex) => {
                                 const isRowNum = Boolean(column.__rownum__);
                                 const isCheckbox = Boolean(column.__checkbox__);
                                 const colKey = String(column.key ?? cdex);
                                 const wPx = props.colWidthByKey[colKey];
-                                const hasW = wPx != null && wPx > 0;
-                                const value = resolveBodyCellValue(
-                                    row,
-                                    column,
-                                    rdex,
-                                    props.page,
-                                    props.data.length,
-                                );
-                                const selectable = isBodyCellSelectable(column);
-                                const hasEditor = selectable && Boolean(column.editor);
-                                const isSelected = isCellInRange(cellRange, rdex, column.key);
-
-                                const stopRowClick = (e: unknown) => {
-                                    if (e && typeof e === "object" && "stopPropagation" in e) {
-                                        (e as React.SyntheticEvent).stopPropagation();
-                                    }
-                                };
-
-                                const rendered = !isCheckbox && !isRowNum && column.render
-                                    ? (typeof column.render === 'function'
-                                        ? column.render({ row, value, columnKey: column.key, rowIndex: rdex, stopRowClick })
-                                        : (isValidElement(column.render)
-                                            ? React.cloneElement(column.render as any, { row, value, columnKey: column.key, rowIndex: rdex, stopRowClick })
-                                            : column.render))
-                                    : null;
-
-                                const tdStyle: CSSProperties = {
-                                    ...cellBorders,
-                                    ...(hasW
-                                        ? colWidthCss(wPx)
-                                        : isCheckbox || isRowNum
-                                          ? { minWidth: isCheckbox ? '40px' : '56px' }
-                                          : {
-                                              minWidth: COL_RESIZE_MIN_PX,
-                                              maxWidth: CELL_MAX_WIDTH_PX,
-                                          }),
-                                    boxSizing: 'border-box',
-                                    whiteSpace: 'nowrap',
-                                    overflow: isCheckbox || isRowNum ? undefined : 'hidden',
-                                    textOverflow: isCheckbox || isRowNum ? undefined : 'ellipsis',
-                                    textAlign: isCheckbox ? 'center' : isRowNum ? 'right' : undefined,
-                                    paddingRight: isCheckbox ? undefined : LINEAR_CELL_PADDING_X,
-                                    paddingLeft: isCheckbox
-                                        ? undefined
-                                        : isRowNum
-                                          ? undefined
-                                          : LINEAR_CELL_PADDING_X,
-                                    cursor: isCheckbox && props.rowSelection ? 'pointer' : undefined,
-                                    ...props.getStickyStyle({ colIndex: cdex, isHeader: false }),
-                                };
-
-                                const onTdPointerDown = (
-                                    e: React.PointerEvent<HTMLTableCellElement>,
-                                ) => {
-                                    if (isCheckbox) {
-                                        e.stopPropagation();
-                                        if (!props.rowSelection) return;
-                                        props.rowSelection.onToggleRow(
-                                            props.rowSelection.pageRowKeys[rdex] ?? String(rdex),
-                                        );
-                                        return;
-                                    }
-                                    if (!selectable) return;
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    if (
-                                        editorSession
-                                        && (editorSession.rowIndex !== rdex
-                                            || editorSession.columnKey !== column.key)
-                                    ) {
-                                        closeEditor();
-                                    }
-                                    dragStateRef.current = {
-                                        active: true,
-                                        columnKey: column.key,
-                                        anchorRow: rdex,
-                                        currentRow: rdex,
-                                        moved: false,
-                                    };
-                                    setCellRange(
-                                        normalizeCellRange(column.key, rdex, rdex),
-                                    );
-                                    tableScrollRef.current?.focus({ preventScroll: true });
-                                    e.currentTarget.setPointerCapture(e.pointerId);
-                                };
-
-                                const onTdClick = (e: React.MouseEvent<HTMLTableCellElement>) => {
-                                    if (isCheckbox) {
-                                        e.stopPropagation();
-                                        return;
-                                    }
-                                    if (selectable || column.render) {
-                                        e.stopPropagation();
-                                    }
-                                };
-
-                                const cellText = rendered ?? formatCellDisplayValue(value);
-                                const isEditing =
-                                    editorSession?.rowIndex === rdex
-                                    && editorSession?.columnKey === column.key
-                                    && hasEditor;
-
-                                const tdChildren = isCheckbox && props.rowSelection ? (
-                                    <input
-                                        type="checkbox"
-                                        className="js-grid-chk-box"
-                                        checked={props.rowSelection.selectedKeys.has(
-                                            props.rowSelection.pageRowKeys[rdex] ?? "",
-                                        )}
-                                        readOnly
-                                        style={{ pointerEvents: 'none' }}
-                                    />
-                                ) : isEditing && column.editor ? (
-                                    <div className="js-grid-cell-inner js-grid-cell-inner--editing">
-                                        {renderGridCellEditor(column.editor, {
-                                            row,
-                                            value,
-                                            columnKey: column.key,
-                                            rowIndex: rdex,
-                                            onChange: handleEditorChange,
-                                            onClose: closeEditor,
-                                            stopRowClick,
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div className="js-grid-cell-inner">{cellText}</div>
-                                );
-
-                                const editingClass = isEditing ? " js-grid-cell-editing" : "";
-                                const selectedClass = isSelected ? " js-grid-cell-selected" : "";
-
-                                const bodyCellDataAttrs = selectable
-                                    ? {
-                                          "data-jsgrid-body-cell": "1",
-                                          "data-jsgrid-row": String(rdex),
-                                          "data-jsgrid-col": column.key,
-                                      }
+                                const layoutW = props.columnLayoutWidths[colKey];
+                                const hasW =
+                                    (wPx != null && wPx > 0) || (layoutW != null && layoutW > 0);
+                                const isDataCol = !isCheckbox && !isRowNum;
+                                const intrinsicLabelCol = isDataCol && !hasW && !freezeActive;
+                                const columnResizable =
+                                    isDataCol && Boolean(props.onColumnWidthChange);
+                                const headerLockedPx = colWidthsReady
+                                    ? effectiveColWidths[cdex]
                                     : undefined;
-
-                                return isCheckbox || isRowNum ? (
-                                    <td
+                                const headerLocked = lockedColumnStyle(headerLockedPx);
+                                return (
+                                    <th
                                         key={colKey}
-                                        className={`${bodyCellBorderClass} ${gridColClassNames(cdex, column, "td")}`}
-                                        onPointerDown={onTdPointerDown}
-                                        onClick={onTdClick}
-                                        style={tdStyle}
+                                        className={gridColClassNames(cdex, column, "th")}
+                                        ref={(el) => {
+                                            props.headerCellRefs.current[cdex] = el;
+                                        }}
+                                        onClick={(e) => {
+                                            if (
+                                                (e.target as HTMLElement).closest(
+                                                    '[data-jsgrid-col-resize="1"]',
+                                                )
+                                            ) {
+                                                return;
+                                            }
+                                            if (e.altKey) {
+                                                props.onFreezeColumn(cdex);
+                                                return;
+                                            }
+                                            if (isCheckbox) {
+                                                props.rowSelection?.onToggleAll();
+                                                return;
+                                            }
+                                            if (isRowNum) return;
+                                            const same = props.sortKey === column.key;
+                                            const nextDir: "ASC" | "DESC" = same
+                                                ? props.sortDir === "DESC"
+                                                    ? "ASC"
+                                                    : "DESC"
+                                                : "ASC";
+                                            props.onSortChange({
+                                                key: column.key,
+                                                direction: nextDir,
+                                            });
+                                        }}
+                                        style={{
+                                            position: "sticky",
+                                            top: 0,
+                                            zIndex: 4,
+                                            backgroundColor: themeStyles.headerBg,
+                                            ...cellBorders,
+                                            boxSizing: "border-box",
+                                            cursor: isCheckbox
+                                                ? "pointer"
+                                                : isRowNum
+                                                  ? "default"
+                                                  : "pointer",
+                                            userSelect: "none",
+                                            textAlign:
+                                                isCheckbox || isRowNum
+                                                    ? "center"
+                                                    : isLinear
+                                                      ? "left"
+                                                      : "center",
+                                            paddingRight: columnResizable
+                                                ? HEADER_COL_RESIZE_CLEARANCE_PX
+                                                : isRowNum
+                                                  ? 10
+                                                  : undefined,
+                                            paddingLeft:
+                                                isLinear && !isCheckbox && !isRowNum
+                                                    ? LINEAR_CELL_PADDING_X
+                                                    : undefined,
+                                            ...(headerLocked
+                                                ? headerLocked
+                                                : hasW
+                                                  ? colWidthCss(wPx ?? layoutW)
+                                                  : isCheckbox || isRowNum
+                                                    ? {
+                                                          minWidth: isCheckbox ? "40px" : "56px",
+                                                      }
+                                                    : {
+                                                          minWidth: COL_RESIZE_MIN_PX,
+                                                          maxWidth: CELL_MAX_WIDTH_PX,
+                                                          overflow: "hidden",
+                                                          textOverflow: "ellipsis",
+                                                          whiteSpace: "nowrap",
+                                                      }),
+                                            ...(isCheckbox || isRowNum
+                                                ? {}
+                                                : hasW
+                                                  ? {
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                        whiteSpace: "nowrap",
+                                                    }
+                                                  : {}),
+                                            ...props.getStickyStyle({ colIndex: cdex, isHeader: true }),
+                                        }}
                                     >
-                                        {tdChildren}
-                                    </td>
-                                ) : (
-                                    <TruncatingTd
-                                        key={colKey}
-                                        className={`${bodyCellBorderClass} ${gridColClassNames(cdex, column, "td")}${selectable ? " js-grid-cell-selectable" : ""}${hasEditor ? " js-grid-cell-editable" : ""}${selectedClass}${editingClass}`}
-                                        {...bodyCellDataAttrs}
-                                        onPointerDown={onTdPointerDown}
-                                        onClick={onTdClick}
-                                        style={tdStyle}
-                                        skipResizeObserve={
-                                            isEditing
-                                            || (freezeActive
-                                                && props.freezeUntilIndex != null
-                                                && cdex <= props.freezeUntilIndex)
-                                        }
-                                    >
-                                        {tdChildren}
-                                    </TruncatingTd>
+                                        {isCheckbox && props.rowSelection ? (
+                                            <div
+                                                className="js-grid-cell-inner"
+                                                style={{ justifyContent: "center" }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    className="js-grid-chk-box"
+                                                    checked={props.rowSelection.headerChecked}
+                                                    disabled={
+                                                        props.rowSelection.pageRowKeys.length === 0
+                                                    }
+                                                    readOnly
+                                                    style={{ pointerEvents: "none" }}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div
+                                                className="js-grid-cell-inner"
+                                                style={{
+                                                    justifyContent: isRowNum
+                                                        ? "center"
+                                                        : isLinear
+                                                          ? "flex-start"
+                                                          : "center",
+                                                    paddingLeft: isLinear ? 0 : undefined,
+                                                    paddingRight:
+                                                        isLinear && !columnResizable ? 6 : undefined,
+                                                    gap: 2,
+                                                }}
+                                            >
+                                                {!isRowNum && !isLinear && (
+                                                    <span
+                                                        style={{
+                                                            display: "inline-block",
+                                                            flexShrink: 0,
+                                                            width: SORT_ICON_PX,
+                                                            minWidth: SORT_ICON_PX,
+                                                            height: SORT_ICON_PX,
+                                                        }}
+                                                        aria-hidden
+                                                    />
+                                                )}
+                                                <span
+                                                    style={{
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                        whiteSpace: "nowrap",
+                                                        minWidth: 0,
+                                                        flex: intrinsicLabelCol
+                                                            ? "1 1 auto"
+                                                            : undefined,
+                                                    }}
+                                                >
+                                                    {column.label}
+                                                </span>
+                                                {!isRowNum && (
+                                                    <span
+                                                        style={{
+                                                            display: "inline-flex",
+                                                            flexShrink: 0,
+                                                            width: SORT_ICON_PX,
+                                                            minWidth: SORT_ICON_PX,
+                                                            height: SORT_ICON_PX,
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                        }}
+                                                        aria-hidden={props.sortKey !== column.key}
+                                                    >
+                                                        {props.sortKey === column.key &&
+                                                            (props.sortDir === "DESC" ? (
+                                                                <span
+                                                                    style={{
+                                                                        display: "inline-flex",
+                                                                        flex: "0 0 auto",
+                                                                    }}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        props.onSortChange({
+                                                                            key: column.key,
+                                                                            direction: "ASC",
+                                                                        });
+                                                                    }}
+                                                                >
+                                                                    <DESC
+                                                                        style={{
+                                                                            width: SORT_ICON_PX,
+                                                                            height: SORT_ICON_PX,
+                                                                            cursor: "pointer",
+                                                                            color: "#111827",
+                                                                        }}
+                                                                    />
+                                                                </span>
+                                                            ) : (
+                                                                <span
+                                                                    style={{
+                                                                        display: "inline-flex",
+                                                                        flex: "0 0 auto",
+                                                                    }}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        props.onSortChange({
+                                                                            key: column.key,
+                                                                            direction: "DESC",
+                                                                        });
+                                                                    }}
+                                                                >
+                                                                    <ASC
+                                                                        style={{
+                                                                            width: SORT_ICON_PX,
+                                                                            height: SORT_ICON_PX,
+                                                                            cursor: "pointer",
+                                                                            color: "#111827",
+                                                                        }}
+                                                                    />
+                                                                </span>
+                                                            ))}
+                                                    </span>
+                                                )}
+                                                {column.filterable && props.onToggleColumnFilter
+                                                    ? (() => {
+                                                          const isOpen =
+                                                              props.openFilterColumnKey ===
+                                                              column.key;
+                                                          const isActive =
+                                                              props.filteredColumnKeys?.has(
+                                                                  column.key,
+                                                              ) === true;
+                                                          return (
+                                                              <span
+                                                                  role="button"
+                                                                  tabIndex={0}
+                                                                  aria-label={`${column.label} 필터`}
+                                                                  data-jsgrid-filter-trigger="1"
+                                                                  data-active={isOpen ? "1" : "0"}
+                                                                  onClick={(e) => {
+                                                                      e.stopPropagation();
+                                                                      const rect = (
+                                                                          e.currentTarget as HTMLElement
+                                                                      ).getBoundingClientRect();
+                                                                      props.onToggleColumnFilter?.({
+                                                                          columnKey: column.key,
+                                                                          top: rect.bottom + 4,
+                                                                          left: rect.left,
+                                                                      });
+                                                                  }}
+                                                                  style={{
+                                                                      display: "inline-flex",
+                                                                      alignItems: "center",
+                                                                      justifyContent: "center",
+                                                                      width: SORT_ICON_PX,
+                                                                      minWidth: SORT_ICON_PX,
+                                                                      height: SORT_ICON_PX,
+                                                                      cursor: "pointer",
+                                                                      borderRadius: 2,
+                                                                      color: isActive
+                                                                          ? "#1d4ed8"
+                                                                          : "#9ca3af",
+                                                                      backgroundColor: isOpen
+                                                                          ? "rgba(29,78,216,0.12)"
+                                                                          : undefined,
+                                                                  }}
+                                                              >
+                                                                  <svg
+                                                                      viewBox="0 0 16 16"
+                                                                      width={SORT_ICON_PX - 2}
+                                                                      height={SORT_ICON_PX - 2}
+                                                                      aria-hidden
+                                                                      focusable="false"
+                                                                  >
+                                                                      <path
+                                                                          d="M2 3h12l-4.5 5.5V13l-3 1V8.5L2 3z"
+                                                                          fill={
+                                                                              isActive
+                                                                                  ? "#1d4ed8"
+                                                                                  : "none"
+                                                                          }
+                                                                          stroke="currentColor"
+                                                                          strokeWidth="1.2"
+                                                                          strokeLinejoin="round"
+                                                                      />
+                                                                  </svg>
+                                                              </span>
+                                                          );
+                                                      })()
+                                                    : null}
+                                            </div>
+                                        )}
+                                        {!isCheckbox && !isRowNum && props.onColumnWidthChange ? (
+                                            <HeaderColumnResizeHandle
+                                                minPx={COL_RESIZE_MIN_PX}
+                                                maxPx={COL_RESIZE_MAX_PX}
+                                                showGrip={isLinear}
+                                                onResize={(w) =>
+                                                    props.onColumnWidthChange?.(column.key, w)
+                                                }
+                                            />
+                                        ) : null}
+                                    </th>
                                 );
                             })}
                         </tr>
-                    );
+                    </thead>
+                </table>
+            </div>
+
+            {!isEmpty ? (
+                <div
+                    role="rowgroup"
+                    className="js-grid-body"
+                    style={{
+                        position: "relative",
+                        width: totalGridWidth > 0 ? totalGridWidth : undefined,
+                        minWidth: "max-content",
+                        height: `${rowVirtualizer.getTotalSize()}px`,
+                    }}
+                >
+                    {rowVirtualizer.getVirtualItems().map((vr) => {
+                        const rdex = vr.index;
+                        const row = props.data[rdex];
+                        const rowId = gridRowNumericId(row);
+                        const rowBorderClass = isLinear ? undefined : "border";
+                        const gridTemplateColumns = colWidthsReady
+                            ? effectiveColWidths.map((w) => `${w}px`).join(" ")
+                            : undefined;
+                        const usingGridLayout = Boolean(gridTemplateColumns);
+
+                        return (
+                            <div
+                                key={vr.key}
+                                role="row"
+                                aria-rowindex={rdex + 2}
+                                className={bodyRowClassName(rdex, rowId, rowBorderClass)}
+                                onClick={
+                                    props.onRowClick
+                                        ? (e) => {
+                                              const target = e.target as HTMLElement;
+                                              if (target.closest(".js-grid-chk")) return;
+                                              props.onRowClick?.(row);
+                                          }
+                                        : undefined
+                                }
+                                style={{
+                                    position: "absolute",
+                                    top: vr.start,
+                                    left: 0,
+                                    width: totalGridWidth > 0 ? totalGridWidth : "100%",
+                                    minWidth:
+                                        totalGridWidth > 0 ? totalGridWidth : "max-content",
+                                    height: `${vr.size}px`,
+                                    display: gridTemplateColumns ? "grid" : "flex",
+                                    ...(gridTemplateColumns
+                                        ? { gridTemplateColumns }
+                                        : { flexDirection: "row", flexWrap: "nowrap" }),
+                                    alignItems: "stretch",
+                                    boxSizing: "border-box",
+                                    cursor: props.onRowClick ? "pointer" : undefined,
+                                    ...(isLinear
+                                        && themeStyles.bodyRowStripeBg
+                                        && rdex % 2 === 0
+                                        ? { backgroundColor: themeStyles.bodyRowStripeBg }
+                                        : undefined),
+                                }}
+                            >
+                                {props.columns.map((column, cdex) => {
+                                    const isRowNum = Boolean(column.__rownum__);
+                                    const isCheckbox = Boolean(column.__checkbox__);
+                                    const colKey = String(column.key ?? cdex);
+                                    const value = resolveBodyCellValue(
+                                        row,
+                                        column,
+                                        rdex,
+                                        props.page,
+                                        props.data.length,
+                                    );
+                                    const selectable = isBodyCellSelectable(column);
+                                    const hasEditor = selectable && Boolean(column.editor);
+                                    const isSelected = isCellInRange(cellRange, rdex, column.key);
+
+                                    const stopRowClick = (e: unknown) => {
+                                        if (e && typeof e === "object" && "stopPropagation" in e) {
+                                            (e as React.SyntheticEvent).stopPropagation();
+                                        }
+                                    };
+
+                                    const rendered =
+                                        !isCheckbox && !isRowNum && column.render
+                                            ? typeof column.render === "function"
+                                                ? column.render({
+                                                      row,
+                                                      value,
+                                                      columnKey: column.key,
+                                                      rowIndex: rdex,
+                                                      stopRowClick,
+                                                  })
+                                                : isValidElement(column.render)
+                                                  ? React.cloneElement(
+                                                        column.render as React.ReactElement<
+                                                            Record<string, unknown>
+                                                        >,
+                                                        {
+                                                            row,
+                                                            value,
+                                                            columnKey: column.key,
+                                                            rowIndex: rdex,
+                                                            stopRowClick,
+                                                        },
+                                                    )
+                                                  : column.render
+                                            : null;
+
+                                    const lockedPx = colWidthsReady
+                                        ? effectiveColWidths[cdex]
+                                        : undefined;
+                                    const bodyLocked = lockedColumnStyle(lockedPx);
+                                    const tdStyle: CSSProperties = {
+                                        height: ROW_HEIGHT_PX,
+                                        boxSizing: "border-box",
+                                        ...cellBorders,
+                                        ...(bodyLocked
+                                            ? bodyLocked
+                                            : {
+                                                  minWidth: isCheckbox
+                                                      ? "40px"
+                                                      : isRowNum
+                                                        ? "56px"
+                                                        : COL_RESIZE_MIN_PX,
+                                                  maxWidth:
+                                                      isCheckbox || isRowNum
+                                                          ? undefined
+                                                          : CELL_MAX_WIDTH_PX,
+                                              }),
+                                        whiteSpace: "nowrap",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: isCheckbox
+                                            ? "center"
+                                            : isRowNum
+                                              ? "flex-end"
+                                              : undefined,
+                                        overflow:
+                                            isCheckbox || isRowNum ? undefined : "hidden",
+                                        textOverflow:
+                                            isCheckbox || isRowNum ? undefined : "ellipsis",
+                                        textAlign: isCheckbox
+                                            ? "center"
+                                            : isRowNum
+                                              ? "right"
+                                              : undefined,
+                                        paddingRight: isCheckbox
+                                            ? undefined
+                                            : LINEAR_CELL_PADDING_X,
+                                        paddingLeft: isCheckbox
+                                            ? undefined
+                                            : isRowNum
+                                              ? undefined
+                                              : LINEAR_CELL_PADDING_X,
+                                        cursor:
+                                            isCheckbox && props.rowSelection
+                                                ? "pointer"
+                                                : selectable
+                                                  ? "cell"
+                                                  : undefined,
+                                        flexShrink: 0,
+                                        ...props.getStickyStyle({ colIndex: cdex, isHeader: false }),
+                                    };
+
+                                    if (usingGridLayout && !bodyLocked) {
+                                        tdStyle.width = "100%";
+                                        tdStyle.minWidth = 0;
+                                        tdStyle.maxWidth = undefined;
+                                        tdStyle.flexShrink = undefined;
+                                    }
+
+                                    const onCellPointerDown = (
+                                        e: React.PointerEvent<HTMLDivElement>,
+                                    ) => {
+                                        if (isCheckbox) {
+                                            e.stopPropagation();
+                                            if (!props.rowSelection) return;
+                                            props.rowSelection.onToggleRow(
+                                                props.rowSelection.pageRowKeys[rdex] ??
+                                                    String(rdex),
+                                            );
+                                            return;
+                                        }
+                                        if (!selectable) return;
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (
+                                            editorSession
+                                            && (editorSession.rowIndex !== rdex
+                                                || editorSession.columnKey !== column.key)
+                                        ) {
+                                            closeEditor();
+                                        }
+                                        dragStateRef.current = {
+                                            active: true,
+                                            columnKey: column.key,
+                                            anchorRow: rdex,
+                                            currentRow: rdex,
+                                            moved: false,
+                                        };
+                                        setCellRange(
+                                            normalizeCellRange(column.key, rdex, rdex),
+                                        );
+                                        tableScrollRef.current?.focus({ preventScroll: true });
+                                        try {
+                                            e.currentTarget.setPointerCapture(e.pointerId);
+                                        } catch {
+                                            /* noop */
+                                        }
+                                    };
+
+                                    const onCellClick = (e: React.MouseEvent<HTMLDivElement>) => {
+                                        if (isCheckbox) {
+                                            e.stopPropagation();
+                                            return;
+                                        }
+                                        if (selectable || column.render) {
+                                            e.stopPropagation();
+                                        }
+                                    };
+
+                                    const cellText = rendered ?? formatCellDisplayValue(value);
+                                    const isEditing =
+                                        editorSession?.rowIndex === rdex
+                                        && editorSession?.columnKey === column.key
+                                        && hasEditor;
+
+                                    const tdChildren =
+                                        isCheckbox && props.rowSelection ? (
+                                            <input
+                                                type="checkbox"
+                                                className="js-grid-chk-box"
+                                                checked={props.rowSelection.selectedKeys.has(
+                                                    props.rowSelection.pageRowKeys[rdex] ?? "",
+                                                )}
+                                                readOnly
+                                                style={{ pointerEvents: "none" }}
+                                            />
+                                        ) : isEditing && column.editor ? (
+                                            <div className="js-grid-cell-inner js-grid-cell-inner--editing">
+                                                {renderGridCellEditor(column.editor, {
+                                                    row,
+                                                    value,
+                                                    columnKey: column.key,
+                                                    rowIndex: rdex,
+                                                    onChange: handleEditorChange,
+                                                    onClose: closeEditor,
+                                                    stopRowClick,
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="js-grid-cell-inner">{cellText}</div>
+                                        );
+
+                                    const bodyCellClassName = [
+                                        gridColClassNames(cdex, column, "td"),
+                                        bodyCellStateClassNames({
+                                            borderClass: bodyCellBorderClass,
+                                            selectable,
+                                            hasEditor,
+                                            isSelected,
+                                            isEditing,
+                                        }),
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" ");
+
+                                    const bodyCellDataAttrs = selectable
+                                        ? {
+                                              "data-jsgrid-body-cell": "1" as const,
+                                              "data-jsgrid-row": String(rdex),
+                                              "data-jsgrid-col": column.key,
+                                          }
+                                        : undefined;
+
+                                    const skipResizeObserve =
+                                        isEditing
+                                        || (freezeActive
+                                            && props.freezeUntilIndex != null
+                                            && cdex <= props.freezeUntilIndex);
+
+                                    if (isCheckbox || isRowNum) {
+                                        return (
+                                            <div
+                                                key={colKey}
+                                                role="presentation"
+                                                className={bodyCellClassName}
+                                                onPointerDown={onCellPointerDown}
+                                                onClick={onCellClick}
+                                                style={tdStyle}
+                                            >
+                                                {tdChildren}
+                                            </div>
+                                        );
+                                    }
+
+                                    if (isEditing || isSelected || skipResizeObserve) {
+                                        return (
+                                            <div
+                                                key={colKey}
+                                                role="presentation"
+                                                className={bodyCellClassName}
+                                                onPointerDown={onCellPointerDown}
+                                                onClick={onCellClick}
+                                                style={tdStyle}
+                                                {...bodyCellDataAttrs}
+                                            >
+                                                {tdChildren}
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <TruncatingDiv
+                                            key={colKey}
+                                            className={bodyCellClassName}
+                                            onPointerDown={onCellPointerDown}
+                                            onClick={onCellClick}
+                                            style={tdStyle}
+                                            skipResizeObserve={skipResizeObserve}
+                                            {...bodyCellDataAttrs}
+                                        >
+                                            {tdChildren}
+                                        </TruncatingDiv>
+                                    );
+                                })}
+                            </div>
+                        );
                     })}
-                </tbody>
-            </table>
+                </div>
+            ) : null}
+
+            {isEmpty && colCount > 0 ? (
+                <div
+                    role="status"
+                    aria-live="polite"
+                    className="js-grid-empty"
+                    style={{
+                        boxSizing: "border-box",
+                        width: totalGridWidth > 0 ? totalGridWidth : "100%",
+                        minWidth: "max-content",
+                    }}
+                >
+                    <div
+                        className="js-grid-empty-message"
+                        style={{
+                            padding: "48px 16px",
+                            textAlign: "center",
+                            color: "#6b7280",
+                            fontSize: 14,
+                            userSelect: "none",
+                        }}
+                    >
+                        데이터가 없습니다
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }

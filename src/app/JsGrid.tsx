@@ -728,6 +728,7 @@ const JsGrid =(props:GridType)=> {
                             sortDir={sortDir}
                             headerCellRefs={headerCellRefs}
                             colWidthByKey={colWidthByKey}
+                            columnLayoutWidths={layoutWidths}
                             freezeUntilIndex={freezeUntilIndex}
                             onColumnWidthChange={props.resizable ? setColumnWidth : undefined}
                             onFreezeColumn={handleFreezeColumn}
